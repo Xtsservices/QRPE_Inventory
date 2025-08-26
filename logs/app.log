@@ -1,0 +1,2 @@
+[2025-08-23T13:59:08.498Z] INFO: User registered successfully: {"user_id":5,"first_name":"John","last_name":"Doe","mobile_number":"98765432310","email_id":"john.doe@example.com"}
+[2025-08-26T16:53:52.575Z] INFO: User registered successfully: {"user_id":6,"first_name":"Johfdfsdfn","last_name":"Doe","mobile_number":"1234567890","email_id":"john.doesfsdf@example.com"}

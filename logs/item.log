@@ -1,0 +1,1 @@
+[2025-08-23T05:11:45.470Z] ACTION: CREATE_ITEM_ERROR | DETAILS: {"error":"Bind parameters must not contain undefined. To pass SQL NULL specify JS null","body":{"item_name":"SUGARavd","unit":"ML","status_id":1,"updated_by":"admin"}}
