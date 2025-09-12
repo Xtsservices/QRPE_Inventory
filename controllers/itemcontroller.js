@@ -1,27 +1,42 @@
 const db = require('../db');
 
+// Helper to map status to name
+const statusMap = {
+  1: 'Active',
+  2: 'Inactive',
+};
+
 // Create item
 exports.createItem = async (req, res) => {
-  let { item_name, unit, status_id, created_by } = req.body;
-  const allowedUnits = ['ML', 'GRMMS'];
-  item_name = item_name ?? null;
-  unit = unit ?? null;
-  status_id = status_id ?? null;
-  created_by = created_by ?? null;
-  if (!item_name || !unit || !status_id) {
-    return res.status(400).json({ success: false, error: 'item_name, unit, and status_id are required.' });
+  let { name, type, status } = req.body;
+
+  name = name ?? null;
+  type = type ?? null;
+  status = status ?? null;
+
+  if (!name || !type || !status) {
+    return res.status(400).json({ success: false, error: 'name, type, and status are required.' });
   }
-  if (!allowedUnits.includes(unit.toUpperCase())) {
-    return res.status(400).json({ success: false, error: 'unit must be either ML or GRMms.' });
-  }
-  item_name = item_name.toLowerCase();
+
+  name = name.toLowerCase();
+  type = type.toLowerCase();
+
   try {
     const [result] = await db.execute(
-      `INSERT INTO item_master (item_name, unit, status_id, created_by, created_date)
-       VALUES (?, ?, ?, ?, UNIX_TIMESTAMP())`,
-      [item_name, unit, status_id, created_by]
+      `INSERT INTO item_master (item_name, type, status_id, created_date)
+       VALUES (?, ?, ?, UNIX_TIMESTAMP())`,
+      [name, type, status]
     );
-    res.status(201).json({ success: true, item_id: result.insertId });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        item_id: result.insertId, // <- item_id included here
+        name,
+        type,
+        status: statusMap[status] || 'Unknown',
+      },
+    });
   } catch (err) {
     console.error('Error creating item:', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -32,7 +47,15 @@ exports.createItem = async (req, res) => {
 exports.getItems = async (req, res) => {
   try {
     const [rows] = await db.execute(`SELECT * FROM item_master`);
-    res.json({ success: true, data: rows });
+
+    const items = rows.map(row => ({
+      item_id: row.item_id,  // <- item_id included here
+      name: row.item_name,
+      type: row.type,
+      status: statusMap[row.status_id] || 'Unknown',
+    }));
+
+    res.json({ success: true, data: items });
   } catch (err) {
     console.error('Error fetching items:', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -42,16 +65,26 @@ exports.getItems = async (req, res) => {
 // Update item
 exports.updateItem = async (req, res) => {
   const { item_id } = req.params;
-  let { item_name, unit, status_id, updated_by } = req.body;
-  if (item_name) {
-    item_name = item_name.toLowerCase();
-  }
+  let { name, type, status } = req.body;
+
+  if (name) name = name.toLowerCase();
+  if (type) type = type.toLowerCase();
+
   try {
     await db.execute(
-      `UPDATE item_master SET item_name=?, unit=?, status_id=?, updated_by=?, updated_date=UNIX_TIMESTAMP() WHERE item_id=?`,
-      [item_name, unit, status_id, updated_by, item_id]
+      `UPDATE item_master SET item_name=?, type=?, status_id=?, updated_date=UNIX_TIMESTAMP() WHERE item_id=?`,
+      [name, type, status, item_id]
     );
-    res.json({ success: true, message: 'Item updated successfully' });
+
+    res.json({
+      success: true,
+      data: {
+        item_id,  // <- item_id included here
+        name,
+        type,
+        status: statusMap[status] || 'Unknown',
+      },
+    });
   } catch (err) {
     console.error('Error updating item:', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
