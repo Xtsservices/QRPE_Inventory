@@ -39,7 +39,7 @@ exports.createItem = async (req, res) => {
     });
   } catch (err) {
     console.error('Error creating item:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+     res.status(500).json({ success: false, error: err.message });
   }
 };
 
@@ -58,6 +58,83 @@ exports.getItems = async (req, res) => {
     res.json({ success: true, data: items });
   } catch (err) {
     console.error('Error fetching items:', err);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// Read item by ID
+exports.updateItem = async (req, res) => {
+  const { item_id } = req.params;
+  let { name, type, status } = req.body;
+
+  try {
+    const fields = [];
+    const values = [];
+
+    if (name) {
+      name = name.toLowerCase();
+      fields.push("item_name=?");
+      values.push(name);
+    }
+    if (type) {
+      type = type.toLowerCase();
+      fields.push("type=?");
+      values.push(type);
+    }
+    if (status) {
+      fields.push("status_id=?");
+      values.push(status);
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ success: false, error: "No fields to update" });
+    }
+
+    values.push(item_id); // for WHERE clause
+
+    const [result] = await db.execute(
+      `UPDATE item_master SET ${fields.join(", ")}, updated_date=UNIX_TIMESTAMP() WHERE item_id=?`,
+      values
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, error: "Item not found" });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        item_id,
+        name,
+        type,
+        status: status ? (statusMap[status] || "Unknown") : undefined,
+      },
+    });
+  } catch (err) {
+    console.error("Error updating item:", err);
+    res.status(500).json({ success: false, error: "Internal server error" });
+  }
+};
+
+exports.getItemById = async (req, res) => {
+  const { item_id } = req.params;
+  try {
+    const [rows] = await db.execute(`SELECT * FROM item_master WHERE item_id=?`, [item_id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+    const row = rows[0];
+    res.json({
+      success: true,
+      data: {
+        item_id: row.item_id,
+        name: row.item_name,
+        type: row.type,
+        status: statusMap[row.status_id] || 'Unknown',
+      },
+    });
+  } catch (err) {
+    console.error('Error fetching item by id:', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
@@ -87,6 +164,26 @@ exports.updateItem = async (req, res) => {
     });
   } catch (err) {
     console.error('Error updating item:', err);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+// ✅ Delete item
+exports.deleteItem = async (req, res) => {
+  const { item_id } = req.params;
+  try {
+    const [result] = await db.execute(
+      `DELETE FROM item_master WHERE item_id = ?`,
+      [item_id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
+
+    res.json({ success: true, message: 'Item deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting item:', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

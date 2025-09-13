@@ -1,88 +1,123 @@
 const db = require('../db');
 
-// Create vendor
+// Create Vendor
 exports.createVendor = async (req, res) => {
-  const { vendor_name, license_number, pan_number, gst_number, point_of_contact, created_by } = req.body;
-  // All fields except created_by are mandatory
+  const {
+    vendor_name,
+    license_number,
+    gst_number,
+    pan_number,
+    contact_person,
+    contact_mobile,
+    contact_email,
+    mobile_number,
+    full_address
+  } = req.body;
+
   if (
     !vendor_name ||
     !license_number ||
-    !pan_number ||
     !gst_number ||
-    !point_of_contact
+    !pan_number ||
+    !contact_person ||
+    !contact_mobile ||
+    !contact_email ||
+    !mobile_number ||
+    !full_address
   ) {
     return res.status(400).json({
       success: false,
-      error: 'vendor_name, license_number, pan_number, gst_number, and point_of_contact are required.'
+      error:
+        "All fields (vendor_name, license_number, gst_number, pan_number, contact_person, contact_mobile, contact_email, mobile_number, full_address) are required."
     });
   }
+
   try {
-    const [result] = await db.execute(
-      `INSERT INTO vendor (vendor_name, license_number, pan_number, gst_number, point_of_contact, created_by, created_date)
-       VALUES (?, ?, ?, ?, ?, ?, UNIX_TIMESTAMP())`,
-      [vendor_name, license_number, pan_number, gst_number, point_of_contact, created_by]
-    );
-    res.status(201).json({ success: true, vendor_id: result.insertId });
+    const query = `
+      INSERT INTO vendors
+      (vendor_name, license_number, gst_number, pan_number, contact_person, contact_mobile, contact_email, mobile_number, full_address)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    const values = [
+      vendor_name,
+      license_number,
+      gst_number,
+      pan_number,
+      contact_person,
+      contact_mobile,
+      contact_email,
+      mobile_number,
+      full_address
+    ];
+    await db.query(query, values);
+    res.json({ success: true, message: "Vendor created successfully" });
   } catch (err) {
-    console.error('Error creating vendor:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    console.error(err);
+    res.status(500).json({ success: false, error: "Internal server error" });
   }
 };
 
-// Read all vendors
+// Get all vendors
 exports.getVendors = async (req, res) => {
   try {
-    const [rows] = await db.execute(`SELECT * FROM vendor`);
+    const [rows] = await db.query("SELECT * FROM vendors");
     res.json({ success: true, data: rows });
   } catch (err) {
-    console.error('Error fetching vendors:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    console.error(err);
+    res.status(500).json({ success: false, error: "Internal server error" });
   }
 };
 
 // Update vendor
 exports.updateVendor = async (req, res) => {
   const { vendor_id } = req.params;
-  let {
+  const {
     vendor_name,
     license_number,
-    pan_number,
     gst_number,
-    point_of_contact,
-    updated_by
+    pan_number,
+    contact_person,
+    contact_mobile,
+    contact_email,
+    mobile_number,
+    full_address
   } = req.body;
 
-  // All fields except updated_by are mandatory for update
-  if (
-    !vendor_name ||
-    !license_number ||
-    !pan_number ||
-    !gst_number ||
-    !point_of_contact
-  ) {
+  if (!vendor_name || !license_number || !gst_number || !pan_number) {
     return res.status(400).json({
       success: false,
-      error: 'vendor_name, license_number, pan_number, gst_number, and point_of_contact are required.'
+      error: "vendor_name, license_number, gst_number, and pan_number are required."
     });
   }
 
-  // Convert undefined to null for SQL
-  vendor_name = vendor_name ?? null;
-  license_number = license_number ?? null;
-  pan_number = pan_number ?? null;
-  gst_number = gst_number ?? null;
-  point_of_contact = point_of_contact ?? null;
-  updated_by = updated_by ?? null;
-
   try {
-    await db.execute(
-      `UPDATE vendor SET vendor_name=?, license_number=?, pan_number=?, gst_number=?, point_of_contact=?, updated_by=?, updated_date=UNIX_TIMESTAMP() WHERE vendor_id=?`,
-      [vendor_name, license_number, pan_number, gst_number, point_of_contact, updated_by, vendor_id]
-    );
-    res.json({ success: true, message: 'Vendor updated successfully' });
+    const query = `
+      UPDATE vendors
+      SET vendor_name = ?, license_number = ?, gst_number = ?, pan_number = ?, contact_person = ?, contact_mobile = ?, contact_email = ?, mobile_number = ?, full_address = ?
+      WHERE vendor_id = ?
+    `;
+    const values = [
+      vendor_name,
+      license_number,
+      gst_number,
+      pan_number,
+      contact_person,
+      contact_mobile,
+      contact_email,
+      mobile_number,
+      full_address,
+      vendor_id
+    ];
+
+    const [result] = await db.query(query, values);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, error: "Vendor not found" });
+    }
+
+    res.json({ success: true, message: "Vendor updated successfully" });
   } catch (err) {
-    console.error('Error updating vendor:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    console.error(err);
+    res.status(500).json({ success: false, error: "Internal server error" });
   }
 };
 
@@ -90,10 +125,13 @@ exports.updateVendor = async (req, res) => {
 exports.deleteVendor = async (req, res) => {
   const { vendor_id } = req.params;
   try {
-    await db.execute(`DELETE FROM vendor WHERE vendor_id=?`, [vendor_id]);
-    res.json({ success: true, message: 'Vendor deleted successfully' });
+    const [result] = await db.query("DELETE FROM vendors WHERE vendor_id = ?", [vendor_id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, error: "Vendor not found" });
+    }
+    res.json({ success: true, message: "Vendor deleted successfully" });
   } catch (err) {
-    console.error('Error deleting vendor:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    console.error(err);
+    res.status(500).json({ success: false, error: "Internal server error" });
   }
 };

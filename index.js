@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors');
 const bodyParser = require('body-parser');
 
 // Import routes
@@ -11,8 +12,11 @@ const rolesRoutes = require('./Routes/rolesRoutes');
 const alertRoutes = require('./Routes/alertRoutes');
 const dashboardRoutes = require('./Routes/dashboardRoutes');
 const authRoutes = require('./Routes/authRoutes');
+const orderRoutes = require('./Routes/orderRoutes');
 
 const app = express();
+app.use(cors({ origin: 'http://localhost:3001' }));
+
 const PORT = 9000;
 
 app.use(bodyParser.json());
@@ -33,6 +37,7 @@ app.use('/api', rolesRoutes);
 app.use('/api', alertRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api', authRoutes);
+app.use('/api', orderRoutes);
 
 app.get('/', (req, res) => {
   res.send('Inventory API is running');
