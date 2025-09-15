@@ -125,13 +125,28 @@ exports.updateVendor = async (req, res) => {
 exports.deleteVendor = async (req, res) => {
   const { vendor_id } = req.params;
   try {
-    const [result] = await db.query("DELETE FROM vendors WHERE vendor_id = ?", [vendor_id]);
+    const [result] = await db.query(
+      "DELETE FROM vendors WHERE vendor_id = ?",
+      [vendor_id]
+    );
+
     if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, error: "Vendor not found" });
     }
+
     res.json({ success: true, message: "Vendor deleted successfully" });
   } catch (err) {
-    console.error(err);
+    console.error("Delete vendor error:", err);
+
+    // Foreign key constraint
+    if (err.code === "ER_ROW_IS_REFERENCED_2" || err.errno === 1451) {
+      return res.status(400).json({
+        success: false,
+        error: "Cannot delete vendor because stock records are linked to it."
+      });
+    }
+
     res.status(500).json({ success: false, error: "Internal server error" });
   }
 };
+

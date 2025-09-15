@@ -15,7 +15,7 @@ const authRoutes = require('./Routes/authRoutes');
 const orderRoutes = require('./Routes/orderRoutes');
 
 const app = express();
-app.use(cors({ origin: 'http://localhost:3001' }));
+app.use(cors({ origin: 'http://localhost:3000' }));
 
 const PORT = 9000;
 
@@ -28,7 +28,7 @@ app.use((req, res, next) => {
 });
 
 // Register routes
-app.use('/api', userRoutes);
+app.use('/api/users', userRoutes); 
 app.use('/api', itemRoutes);
 app.use('/api', vendorRoutes);
 app.use('/api', stockRoutes);
@@ -38,6 +38,7 @@ app.use('/api', alertRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api', authRoutes);
 app.use('/api', orderRoutes);
+
 
 app.get('/', (req, res) => {
   res.send('Inventory API is running');
