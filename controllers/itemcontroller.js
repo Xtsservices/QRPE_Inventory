@@ -1,32 +1,59 @@
-const db = require('../db');
+const db = require('../db'); // <-- this imports your MySQL connection
 
-// Helper to map status to name
 const statusMap = {
   1: 'Active',
   2: 'Inactive',
 };
 
-// Create item
+// ===== CREATE ITEM =====
 exports.createItem = async (req, res) => {
-  let { name, type, status } = req.body;
+  let { name, type, units, kg, grams, litres, status } = req.body;
 
-  name = name ?? null;
-  type = type ?? null;
-  status = status ?? null;
+  name = name?.trim().toLowerCase() ?? null;
+  type = type?.trim().toLowerCase() ?? null;
+  units = units ?? null;
+  kg = kg ?? null;
+  grams = grams ?? null;
+  litres = litres ?? null;
+  status = status ?? 1; // default active
 
-  if (!name || !type || !status) {
-    return res.status(400).json({ success: false, error: 'name, type, and status are required.' });
+  // Require mandatory fields (only name & type)
+  if (!name || !type) {
+    return res.status(400).json({
+      success: false,
+      error: "name and type are required.",
+    });
   }
 
-  name = name.toLowerCase();
-  type = type.toLowerCase();
-  status = Number(status); // ensure number
+  // At least one quantity field required
+  if ((kg === null && grams === null && litres === null && units === null)) {
+    return res.status(400).json({
+      success: false,
+      error: "At least one quantity (unit/kg/grams/litres) must be provided.",
+    });
+  }
+
+  // Normalize: if kg/grams exist, litres = 0
+  if (kg !== null || grams !== null) {
+    litres = 0;
+    kg = kg ?? 0;
+    grams = grams ?? 0;
+  } else if (litres !== null) {
+    kg = 0;
+    grams = 0;
+  }
 
   try {
+     const [rows] = await db.execute("SELECT item_id FROM items ORDER BY item_id DESC LIMIT 1");
+    let lastId = rows.length ? rows[0].item_id : null;
+    let number = lastId ? parseInt(lastId.replace('I', '')) + 1 : 1;
+    const item_id = 'I' + number.toString().padStart(3, '0');
+
+    // Insert new item
     const [result] = await db.execute(
-      `INSERT INTO item_master (item_name, type, status_id, created_date)
-       VALUES (?, ?, ?, UNIX_TIMESTAMP())`,
-      [name, type, status]
+      `INSERT INTO items (item_id, item_name, type, units, kg, grams, litres, status_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      [item_id, name, type, units, kg, grams, litres, status]
     );
 
     res.status(201).json({
@@ -35,42 +62,48 @@ exports.createItem = async (req, res) => {
         item_id: result.insertId,
         name,
         type,
-        status_id: status,                 // number for filtering
-        status: statusMap[status] || 'Unknown', // string for display
+        units,
+        kg,
+        grams,
+        litres,
+        status_id: status,
+        status: statusMap[status] || "Unknown",
       },
     });
   } catch (err) {
-    console.error('Error creating item:', err);
+    console.error("Error creating item:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 };
 
-// Read all items
+// ===== READ ALL ITEMS =====
 exports.getItems = async (req, res) => {
   try {
-    const [rows] = await db.execute(`SELECT * FROM item_master`);
+    const [rows] = await db.execute("SELECT * FROM items");
 
     const items = rows.map(row => ({
-      item_id: row.item_id,  // <- item_id included here
+      item_id: row.item_id,
       name: row.item_name,
       type: row.type,
-      status: statusMap[row.status_id] || 'Unknown',
+      units: row.units,
+      kg: row.kg,
+      grams: row.grams,
+      litres: row.litres,
+      status: statusMap[row.status_id] || "Unknown",
     }));
 
     res.json({ success: true, data: items });
   } catch (err) {
-    console.error('Error fetching items:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    console.error("Error fetching items:", err);
+    res.status(500).json({ success: false, error: "Internal server error" });
   }
 };
 
-// Read item by ID
-
-
+// ===== READ ITEM BY ID =====
 exports.getItemById = async (req, res) => {
   const { item_id } = req.params;
   try {
-    const [rows] = await db.execute(`SELECT * FROM item_master WHERE item_id=?`, [item_id]);
+    const [rows] = await db.execute(`SELECT * FROM items WHERE item_id=?`, [item_id]);
     if (rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Item not found' });
     }
@@ -81,6 +114,7 @@ exports.getItemById = async (req, res) => {
         item_id: row.item_id,
         name: row.item_name,
         type: row.type,
+        units: row.units,
         status: statusMap[row.status_id] || 'Unknown',
       },
     });
@@ -90,65 +124,75 @@ exports.getItemById = async (req, res) => {
   }
 };
 
-// Update item
+// ===== UPDATE ITEM =====
 exports.updateItem = async (req, res) => {
-  const { item_id } = req.params;
-  let { name, type, status } = req.body;
+    try {
+        const { item_id, name, type, units, kg, grams, litres, status_id } = req.body;
 
-  if (!name && !type && !status) {
-    return res.status(400).json({ success: false, error: 'No fields to update' });
-  }
+        // Validate required fields
+        if (!item_id) {
+            return res.status(400).json({ success: false, error: "Item ID is required" });
+        }
+        if (!name || !type) {
+            return res.status(400).json({ success: false, error: "Name and Type are required" });
+        }
 
-  try {
-    const fields = [];
-    const values = [];
+        // Build the update query dynamically only for fields that exist
+        let updateFields = [];
+        let params = [];
 
-    if (name) {
-      fields.push("item_name=?");
-      values.push(name.toLowerCase());
+        if (name) {
+            updateFields.push("item_name = ?");
+            params.push(name);
+        }
+        if (type) {
+            updateFields.push("type = ?");
+            params.push(type);
+        }
+        if (units !== undefined) {
+            updateFields.push("units = ?");
+            params.push(units);
+        }
+        if (kg !== undefined) {
+            updateFields.push("kg = ?");
+            params.push(kg);
+        }
+        if (grams !== undefined) {
+            updateFields.push("grams = ?");
+            params.push(grams);
+        }
+        if (litres !== undefined) {
+            updateFields.push("litres = ?");
+            params.push(litres);
+        }
+        if (status_id !== undefined) {
+            updateFields.push("status_id = ?");
+            params.push(status_id);
+        }
+
+        // Add the WHERE clause param
+        params.push(item_id);
+
+        const sql = `UPDATE items SET ${updateFields.join(", ")} WHERE item_id = ?`;
+
+        const [result] = await db.query(sql, params);
+
+        return res.json({ success: true, message: "Item updated successfully", result });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, error: "Server Error" });
     }
-    if (type) {
-      fields.push("type=?");
-      values.push(type.toLowerCase());
-    }
-    if (status) {
-      fields.push("status_id=?");
-      values.push(Number(status));
-    }
-
-    values.push(item_id);
-
-    const [result] = await db.execute(
-      `UPDATE item_master SET ${fields.join(", ")}, updated_date=UNIX_TIMESTAMP() WHERE item_id=?`,
-      values
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, error: 'Item not found' });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        item_id,
-        name,
-        type,
-        status_id: status ? Number(status) : undefined,
-        status: status ? statusMap[Number(status)] : undefined,
-      },
-    });
-  } catch (err) {
-    console.error('Error updating item:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
 };
 
-// ✅ Delete item
+
+// ===== SOFT DELETE ITEM =====
 exports.deleteItem = async (req, res) => {
   const { item_id } = req.params;
   try {
     const [result] = await db.execute(
-      `DELETE FROM item_master WHERE item_id = ?`,
+      `UPDATE items 
+       SET status_id = 2, updated_at = NOW() 
+       WHERE item_id = ?`,
       [item_id]
     );
 
@@ -156,9 +200,9 @@ exports.deleteItem = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Item not found' });
     }
 
-    res.json({ success: true, message: 'Item deleted successfully' });
+    res.json({ success: true, message: 'Item marked as inactive' });
   } catch (err) {
-    console.error('Error deleting item:', err);
+    console.error('Error soft deleting item:', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };

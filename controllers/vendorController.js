@@ -35,8 +35,8 @@ exports.createVendor = async (req, res) => {
   try {
     const query = `
       INSERT INTO vendors
-      (vendor_name, license_number, gst_number, pan_number, contact_person, contact_mobile, contact_email, mobile_number, full_address)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (vendor_name, license_number, gst_number, pan_number, contact_person, contact_mobile, contact_email, mobile_number, full_address, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `;
     const values = [
       vendor_name,
@@ -57,10 +57,10 @@ exports.createVendor = async (req, res) => {
   }
 };
 
-// Get all vendors
+// Get all vendors (only active ones)
 exports.getVendors = async (req, res) => {
   try {
-    const [rows] = await db.query("SELECT * FROM vendors");
+    const [rows] = await db.query("SELECT * FROM vendors WHERE status = 1");
     res.json({ success: true, data: rows });
   } catch (err) {
     console.error(err);
@@ -95,7 +95,7 @@ exports.updateVendor = async (req, res) => {
     const query = `
       UPDATE vendors
       SET vendor_name = ?, license_number = ?, gst_number = ?, pan_number = ?, contact_person = ?, contact_mobile = ?, contact_email = ?, mobile_number = ?, full_address = ?
-      WHERE vendor_id = ?
+      WHERE vendor_id = ? AND status = 1
     `;
     const values = [
       vendor_name,
@@ -114,7 +114,7 @@ exports.updateVendor = async (req, res) => {
     if (result.affectedRows === 0) {
       return res
         .status(404)
-        .json({ success: false, error: "Vendor not found" });
+        .json({ success: false, error: "Vendor not found or inactive" });
     }
 
     res.json({ success: true, message: "Vendor updated successfully" });
@@ -124,32 +124,25 @@ exports.updateVendor = async (req, res) => {
   }
 };
 
-// Delete vendor
+// Soft delete vendor
 exports.deleteVendor = async (req, res) => {
   const { vendor_id } = req.params;
   try {
-    const [result] = await db.query("DELETE FROM vendors WHERE vendor_id = ?", [
-      vendor_id,
-    ]);
+    const [result] = await db.query(
+      "UPDATE vendors SET status = 0 WHERE vendor_id = ? AND status = 1",
+      [vendor_id]
+    );
 
     if (result.affectedRows === 0) {
-      return res
-        .status(404)
-        .json({ success: false, error: "Vendor not found" });
-    }
-
-    res.json({ success: true, message: "Vendor deleted successfully" });
-  } catch (err) {
-    console.error("Delete vendor error:", err);
-
-    // Foreign key constraint
-    if (err.code === "ER_ROW_IS_REFERENCED_2" || err.errno === 1451) {
-      return res.status(400).json({
+      return res.status(404).json({
         success: false,
-        error: "Cannot delete vendor because stock records are linked to it.",
+        error: "Vendor not found or already inactive",
       });
     }
 
+    res.json({ success: true, message: "Vendor deleted (soft) successfully" });
+  } catch (err) {
+    console.error("Soft delete vendor error:", err);
     res.status(500).json({ success: false, error: "Internal server error" });
   }
 };
