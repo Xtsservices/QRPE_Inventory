@@ -1,2 +1,18 @@
 [2025-08-23T13:59:08.498Z] INFO: User registered successfully: {"user_id":5,"first_name":"John","last_name":"Doe","mobile_number":"98765432310","email_id":"john.doe@example.com"}
 [2025-08-26T16:53:52.575Z] INFO: User registered successfully: {"user_id":6,"first_name":"Johfdfsdfn","last_name":"Doe","mobile_number":"1234567890","email_id":"john.doesfsdf@example.com"}
+[2025-09-15T11:38:10.004Z] ERROR: Error registering user: Table 'inventory.user' doesn't exist
+[2025-09-15T11:42:13.410Z] ERROR: Error registering user: Table 'inventory.user' doesn't exist
+[2025-09-15T11:52:11.390Z] ERROR: Error registering user: Table 'inventory.user' doesn't exist
+[2025-09-15T11:56:11.972Z] ERROR: Error registering user: Table 'inventory.user' doesn't exist
+[2025-09-15T11:57:01.538Z] ERROR: Error registering user: Table 'inventory.user' doesn't exist
+[2025-09-15T11:57:20.174Z] ERROR: Error registering user: Table 'inventory.user' doesn't exist
+[2025-09-15T11:58:30.725Z] ERROR: Error registering user: Table 'inventory.user' doesn't exist
+[2025-09-15T12:00:31.942Z] INFO: User registered: {"id":"USR005","name":"David Brown","role":"Staff","mobileNumber":"9876543214","email":"david.brown@example.com"}
+[2025-09-15T12:10:37.088Z] ERROR: Error registering user: Bind parameters must not contain undefined. To pass SQL NULL specify JS null
+[2025-09-15T12:10:38.667Z] ERROR: Error registering user: Bind parameters must not contain undefined. To pass SQL NULL specify JS null
+[2025-09-15T12:12:42.121Z] ERROR: Error registering user: Duplicate entry 'USR005' for key 'PRIMARY'
+[2025-09-15T12:17:30.078Z] INFO: User registered: {"id":"USR006","name":"David Brown","role":"Staff","mobileNumber":"9876543215","email":"david.brown1@example.com"}
+[2025-09-15T12:21:23.225Z] INFO: User registered: {"id":"USR007","name":"ewdewf","role":"Admin","mobileNumber":"9618979699","email":"kiran@gmail.com"}
+[2025-09-15T12:39:32.472Z] INFO: User registered: {"id":"USR008","name":"rayapudi","role":"Admin","mobileNumber":"8686067277","email":"kiran1@gmail.com"}
+[2025-09-15T12:48:40.214Z] INFO: User registered: {"id":"USR009","name":"kiranr","role":"Manager","mobileNumber":"9618796996","email":"kiran2@gmail.com"}
+[2025-09-15T17:54:12.384Z] INFO: User registered: {"id":"USR010","name":"sai","role":"Manager","mobileNumber":"9441391430","email":"sai@gamil.com"}
