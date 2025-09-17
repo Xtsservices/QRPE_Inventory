@@ -69,10 +69,12 @@ exports.registerUser = async (req, res) => {
 exports.getAllUsers = async (req, res) => {
   try {
     const [rows] = await db.execute(
-      `SELECT u.*, l.login_date
-       FROM user u
-       LEFT JOIN login l ON u.id = l.user_id
-       ORDER BY u.created_date DESC`
+     `SELECT u.id, u.name, u.role, u.email,
+          u.mobile_number AS mobileNumber,   -- ✅ alias here
+          l.login_date
+   FROM user u
+   LEFT JOIN login l ON u.id = l.user_id
+   ORDER BY u.created_date DESC`
     );
     res.json({ success: true, data: rows });
   } catch (err) {
@@ -83,16 +85,23 @@ exports.getAllUsers = async (req, res) => {
 
 // ===== GET USER BY ID =====
 exports.getUserById = async (req, res) => {
-  const { user_id } = req.params;  // <-- changed to match router
+  const { user_id } = req.params;  // <-- only once
+
   try {
     const [rows] = await db.execute(
-      `SELECT u.*, l.login_date
+      `SELECT u.id, u.name, u.role, u.email,
+         u.mobile_number AS mobileNumber,
+         l.login_date
        FROM user u
        LEFT JOIN login l ON u.id = l.user_id
        WHERE u.id = ?`,
-      [user_id]  // <-- changed to match router
+      [user_id]
     );
-    if (rows.length === 0) return res.status(404).json({ success: false, error: 'User not found' });
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
     res.json({ success: true, data: rows[0] });
   } catch (err) {
     console.error('Error fetching user:', err);
@@ -103,50 +112,33 @@ exports.getUserById = async (req, res) => {
 // ===== UPDATE USER =====
 exports.updateUser = async (req, res) => {
   const { user_id } = req.params;
-  const { name, role, mobileNumber, email } = req.body;
+  const { name, email, mobileNumber, role } = req.body;
 
-  if (!name || !mobileNumber || !email || !role) {
-    return res.status(400).json({ success: false, error: 'Name, mobileNumber, email, and role are required.' });
-  }
-
-  let connection;
   try {
-    connection = await db.getConnection();
-    await connection.beginTransaction();
-
-    // Check duplicates excluding current user
-    const [mobileRows] = await connection.execute(`SELECT id FROM user WHERE mobile_number = ? AND id != ?`, [mobileNumber, user_id]);
-    if (mobileRows.length > 0) { await connection.rollback(); return res.status(409).json({ success: false, error: 'Mobile number already exists.' }); }
-
-    const [emailRows] = await connection.execute(`SELECT id FROM user WHERE email = ? AND id != ?`, [email, user_id]);
-    if (emailRows.length > 0) { await connection.rollback(); return res.status(409).json({ success: false, error: 'Email already exists.' }); }
-
-    await connection.execute(
-      `UPDATE user SET name = ?, role = ?, mobile_number = ?, email = ? WHERE id = ?`,
-      [name, role, mobileNumber, email, user_id]
+    const [result] = await db.execute(
+      `UPDATE user SET name=?, email=?, mobile_number=?, role=? WHERE id=?`,
+      [name, email, mobileNumber, role, user_id]
     );
-
-    await connection.commit();
-    res.json({ success: true, message: 'User updated successfully', data: { id: user_id, name, role, mobileNumber, email } });
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, error: 'User not found' });
+    res.json({ success: true, message: 'User updated successfully' });
   } catch (err) {
-    if (connection) await connection.rollback();
-    console.error('Error updating user:', err);
+    console.error(err);
     res.status(500).json({ success: false, error: 'Internal server error' });
-  } finally {
-    if (connection) connection.release();
   }
 };
 
-// ===== DELETE USER =====
 exports.deleteUser = async (req, res) => {
-  const { user_id } = req.params;
+  const { user_id } = req.params; // Make sure this matches your route param
 
   let connection;
   try {
     connection = await db.getConnection();
     await connection.beginTransaction();
 
+    // Delete from login table
     await connection.execute(`DELETE FROM login WHERE user_id = ?`, [user_id]);
+
+    // Delete from user table
     const [result] = await connection.execute(`DELETE FROM user WHERE id = ?`, [user_id]);
 
     if (result.affectedRows === 0) {
@@ -158,9 +150,10 @@ exports.deleteUser = async (req, res) => {
     res.json({ success: true, message: 'User deleted successfully' });
   } catch (err) {
     if (connection) await connection.rollback();
-    console.error('Error deleting user:', err);
+    console.error('Error deleting user:', err); // <-- Look at this in terminal
     res.status(500).json({ success: false, error: 'Internal server error' });
   } finally {
     if (connection) connection.release();
   }
 };
+``

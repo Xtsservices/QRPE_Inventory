@@ -1,4 +1,4 @@
-const db = require('../db');
+const db = require("../db");
 
 // Create Vendor
 exports.createVendor = async (req, res) => {
@@ -11,7 +11,7 @@ exports.createVendor = async (req, res) => {
     contact_mobile,
     contact_email,
     mobile_number,
-    full_address
+    full_address,
   } = req.body;
 
   if (
@@ -28,7 +28,7 @@ exports.createVendor = async (req, res) => {
     return res.status(400).json({
       success: false,
       error:
-        "All fields (vendor_name, license_number, gst_number, pan_number, contact_person, contact_mobile, contact_email, mobile_number, full_address) are required."
+        "All fields (vendor_name, license_number, gst_number, pan_number, contact_person, contact_mobile, contact_email, mobile_number, full_address) are required.",
     });
   }
 
@@ -47,7 +47,7 @@ exports.createVendor = async (req, res) => {
       contact_mobile,
       contact_email,
       mobile_number,
-      full_address
+      full_address,
     ];
     await db.query(query, values);
     res.json({ success: true, message: "Vendor created successfully" });
@@ -80,13 +80,14 @@ exports.updateVendor = async (req, res) => {
     contact_mobile,
     contact_email,
     mobile_number,
-    full_address
+    full_address,
   } = req.body;
 
   if (!vendor_name || !license_number || !gst_number || !pan_number) {
     return res.status(400).json({
       success: false,
-      error: "vendor_name, license_number, gst_number, and pan_number are required."
+      error:
+        "vendor_name, license_number, gst_number, and pan_number are required.",
     });
   }
 
@@ -106,12 +107,14 @@ exports.updateVendor = async (req, res) => {
       contact_email,
       mobile_number,
       full_address,
-      vendor_id
+      vendor_id,
     ];
 
     const [result] = await db.query(query, values);
     if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, error: "Vendor not found" });
+      return res
+        .status(404)
+        .json({ success: false, error: "Vendor not found" });
     }
 
     res.json({ success: true, message: "Vendor updated successfully" });
@@ -125,13 +128,14 @@ exports.updateVendor = async (req, res) => {
 exports.deleteVendor = async (req, res) => {
   const { vendor_id } = req.params;
   try {
-    const [result] = await db.query(
-      "DELETE FROM vendors WHERE vendor_id = ?",
-      [vendor_id]
-    );
+    const [result] = await db.query("DELETE FROM vendors WHERE vendor_id = ?", [
+      vendor_id,
+    ]);
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, error: "Vendor not found" });
+      return res
+        .status(404)
+        .json({ success: false, error: "Vendor not found" });
     }
 
     res.json({ success: true, message: "Vendor deleted successfully" });
@@ -142,11 +146,10 @@ exports.deleteVendor = async (req, res) => {
     if (err.code === "ER_ROW_IS_REFERENCED_2" || err.errno === 1451) {
       return res.status(400).json({
         success: false,
-        error: "Cannot delete vendor because stock records are linked to it."
+        error: "Cannot delete vendor because stock records are linked to it.",
       });
     }
 
     res.status(500).json({ success: false, error: "Internal server error" });
   }
 };
-

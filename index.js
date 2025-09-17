@@ -28,7 +28,7 @@ app.use((req, res, next) => {
 });
 
 // Register routes
-app.use('/api/users', userRoutes); 
+
 app.use('/api', itemRoutes);
 app.use('/api', vendorRoutes);
 app.use('/api', stockRoutes);
@@ -38,6 +38,8 @@ app.use('/api', alertRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api', authRoutes);
 app.use('/api', orderRoutes);
+app.use('/api/users', userRoutes);
+
 
 
 app.get('/', (req, res) => {

@@ -20,6 +20,7 @@ exports.createItem = async (req, res) => {
 
   name = name.toLowerCase();
   type = type.toLowerCase();
+  status = Number(status); // ensure number
 
   try {
     const [result] = await db.execute(
@@ -31,15 +32,16 @@ exports.createItem = async (req, res) => {
     res.status(201).json({
       success: true,
       data: {
-        item_id: result.insertId, // <- item_id included here
+        item_id: result.insertId,
         name,
         type,
-        status: statusMap[status] || 'Unknown',
+        status_id: status,                 // number for filtering
+        status: statusMap[status] || 'Unknown', // string for display
       },
     });
   } catch (err) {
     console.error('Error creating item:', err);
-     res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 };
 
@@ -63,58 +65,7 @@ exports.getItems = async (req, res) => {
 };
 
 // Read item by ID
-exports.updateItem = async (req, res) => {
-  const { item_id } = req.params;
-  let { name, type, status } = req.body;
 
-  try {
-    const fields = [];
-    const values = [];
-
-    if (name) {
-      name = name.toLowerCase();
-      fields.push("item_name=?");
-      values.push(name);
-    }
-    if (type) {
-      type = type.toLowerCase();
-      fields.push("type=?");
-      values.push(type);
-    }
-    if (status) {
-      fields.push("status_id=?");
-      values.push(status);
-    }
-
-    if (fields.length === 0) {
-      return res.status(400).json({ success: false, error: "No fields to update" });
-    }
-
-    values.push(item_id); // for WHERE clause
-
-    const [result] = await db.execute(
-      `UPDATE item_master SET ${fields.join(", ")}, updated_date=UNIX_TIMESTAMP() WHERE item_id=?`,
-      values
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, error: "Item not found" });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        item_id,
-        name,
-        type,
-        status: status ? (statusMap[status] || "Unknown") : undefined,
-      },
-    });
-  } catch (err) {
-    console.error("Error updating item:", err);
-    res.status(500).json({ success: false, error: "Internal server error" });
-  }
-};
 
 exports.getItemById = async (req, res) => {
   const { item_id } = req.params;
@@ -144,22 +95,46 @@ exports.updateItem = async (req, res) => {
   const { item_id } = req.params;
   let { name, type, status } = req.body;
 
-  if (name) name = name.toLowerCase();
-  if (type) type = type.toLowerCase();
+  if (!name && !type && !status) {
+    return res.status(400).json({ success: false, error: 'No fields to update' });
+  }
 
   try {
-    await db.execute(
-      `UPDATE item_master SET item_name=?, type=?, status_id=?, updated_date=UNIX_TIMESTAMP() WHERE item_id=?`,
-      [name, type, status, item_id]
+    const fields = [];
+    const values = [];
+
+    if (name) {
+      fields.push("item_name=?");
+      values.push(name.toLowerCase());
+    }
+    if (type) {
+      fields.push("type=?");
+      values.push(type.toLowerCase());
+    }
+    if (status) {
+      fields.push("status_id=?");
+      values.push(Number(status));
+    }
+
+    values.push(item_id);
+
+    const [result] = await db.execute(
+      `UPDATE item_master SET ${fields.join(", ")}, updated_date=UNIX_TIMESTAMP() WHERE item_id=?`,
+      values
     );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, error: 'Item not found' });
+    }
 
     res.json({
       success: true,
       data: {
-        item_id,  // <- item_id included here
+        item_id,
         name,
         type,
-        status: statusMap[status] || 'Unknown',
+        status_id: status ? Number(status) : undefined,
+        status: status ? statusMap[Number(status)] : undefined,
       },
     });
   } catch (err) {
