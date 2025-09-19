@@ -13,6 +13,7 @@ const alertRoutes = require('./Routes/alertRoutes');
 const dashboardRoutes = require('./Routes/dashboardRoutes');
 const authRoutes = require('./Routes/authRoutes');
 const orderRoutes = require('./Routes/orderRoutes');
+const inventoryrequestRoutes = require("./Routes/inventoryrequestRoutes");
 
 const app = express();
 app.use(cors({ origin: 'http://localhost:3000' }));
@@ -39,8 +40,7 @@ app.use('/api', dashboardRoutes);
 app.use('/api', authRoutes);
 app.use('/api', orderRoutes);
 app.use('/api/users', userRoutes);
-
-
+app.use("/api/inventory-requests", inventoryrequestRoutes);
 
 app.get('/', (req, res) => {
   res.send('Inventory API is running');

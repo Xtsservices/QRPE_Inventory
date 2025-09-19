@@ -3,8 +3,8 @@ const db = require('../db');
 // Get dashboard counts and alert names
 exports.getDashboardCounts = async (req, res) => {
   try {
-    const [[itemCount]] = await db.execute('SELECT COUNT(*) AS item_count FROM item_master');
-    const [[vendorCount]] = await db.execute('SELECT COUNT(*) AS vendor_count FROM vendor');
+    const [[itemCount]] = await db.execute('SELECT COUNT(*) AS item_count FROM items');
+    const [[vendorCount]] = await db.execute('SELECT COUNT(*) AS vendor_count FROM vendors');
     const [[alertCount]] = await db.execute('SELECT COUNT(*) AS alert_count FROM alert');
     const [alertNames] = await db.execute('SELECT alert_name FROM alert');
 
