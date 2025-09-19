@@ -1,39 +1,58 @@
 const db = require('../db');
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = 'your_jwt_secret'; // Use env variable in production
+const JWT_SECRET = 'your_jwt_secret'; // ⚠️ Use process.env.JWT_SECRET in production
 
-// Login with OTP
+// ===== LOGIN WITH OTP =====
 exports.loginWithOtp = async (req, res) => {
   const { mobile_number, otp_code } = req.body;
-  // Mobile number must be exactly 10 digits
+
+  // Validation
   if (!mobile_number || !/^\d{10}$/.test(mobile_number) || !otp_code) {
-    return res.status(400).json({ success: false, error: 'mobile_number must be exactly 10 digits and otp_code is required.' });
+    return res.status(400).json({
+      success: false,
+      error: 'mobile_number must be exactly 10 digits and otp_code is required.'
+    });
   }
 
   try {
-    // Check OTP (default is 123456 or from table)
+    // Check OTP with expiry (10 min)
     const [rows] = await db.execute(
-      `SELECT * FROM otp WHERE mobile_number = ? AND otp_code = ? ORDER BY created_at DESC LIMIT 1`,
+      `SELECT * FROM otp 
+       WHERE mobile_number = ? 
+       AND otp_code = ? 
+       AND expires_at > UNIX_TIMESTAMP()
+       ORDER BY created_at DESC LIMIT 1`,
       [mobile_number, otp_code]
     );
-    if (rows.length === 0 && otp_code !== '123456') {
-      return res.status(401).json({ success: false, error: 'Invalid OTP.' });
+
+    if (rows.length === 0) {
+      return res.status(401).json({ success: false, error: 'Invalid or expired OTP.' });
     }
 
-    // Get user_id (assuming you have a users table)
+    // Get user_id from users table
     const [userRows] = await db.execute(
-      `SELECT user_id FROM user WHERE mobile_number = ?`,
+      `SELECT id FROM users WHERE mobile_number = ?`,
       [mobile_number]
     );
-    if (userRows.length === 0) {
-      return res.status(404).json({ success: false, error: 'User not found.' });
-    }
-    const user_id = userRows[0].user_id;
 
-    // Insert login history (success)
+    if (userRows.length === 0) {
+      // Auto-register user if not found
+      const newId = `USR${Date.now().toString().slice(-6)}`;
+      await db.execute(
+        `INSERT INTO users (id, name, role, mobile_number, email, created_by, created_date, status)
+         VALUES (?, ?, ?, ?, ?, ?, UNIX_TIMESTAMP(), ?)`,
+        [newId, 'New User', 'User', mobile_number, null, 'System', 'Active']
+      );
+      user_id = newId;
+    } else {
+      user_id = userRows[0].id;
+    }
+
+    // Insert login entry
     await db.execute(
-      `INSERT INTO login_history (user_id, status, login_time) VALUES (?, 'success', UNIX_TIMESTAMP())`,
-      [user_id]
+      `INSERT INTO login (user_id, login_by, login_date, status) 
+       VALUES (?, ?, UNIX_TIMESTAMP(), 'Active')`,
+      [user_id, mobile_number]
     );
 
     // Generate JWT token
@@ -46,30 +65,38 @@ exports.loginWithOtp = async (req, res) => {
   }
 };
 
-// Resend OTP (after 5 seconds)
+// ===== RESEND OTP =====
 exports.resendOtp = async (req, res) => {
   const { mobile_number } = req.body;
-  // Mobile number must be exactly 10 digits
+
   if (!mobile_number || !/^\d{10}$/.test(mobile_number)) {
     return res.status(400).json({ success: false, error: 'mobile_number must be exactly 10 digits.' });
   }
+
   try {
-    // Check last OTP time
+    // Throttle: at least 5 sec gap
     const [rows] = await db.execute(
       `SELECT created_at FROM otp WHERE mobile_number = ? ORDER BY created_at DESC LIMIT 1`,
       [mobile_number]
     );
+
     const now = Math.floor(Date.now() / 1000);
     if (rows.length > 0 && now - rows[0].created_at < 5) {
-      return res.status(429).json({ success: false, error: 'Please wait 5 seconds before resending OTP.' });
+      const wait = 5 - (now - rows[0].created_at);
+      return res.status(429).json({ success: false, error: `Please wait ${wait} more seconds before resending OTP.` });
     }
 
-    // Generate and insert new OTP (here, always 123456 for demo)
-    const otp_code = '123456';
+    // Generate OTP (random 6-digit)
+    const otp_code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store OTP with expiry (10 min = 600 sec)
     await db.execute(
-      `INSERT INTO otp (mobile_number, otp_code, created_at) VALUES (?, ?, UNIX_TIMESTAMP())`,
+      `INSERT INTO otp (mobile_number, otp_code, created_at, expires_at) 
+       VALUES (?, ?, UNIX_TIMESTAMP(), UNIX_TIMESTAMP() + 600)`,
       [mobile_number, otp_code]
     );
+
+    // In production: send via SMS gateway
     res.json({ success: true, message: 'OTP resent successfully.', otp_code });
   } catch (err) {
     console.error('Error in resendOtp:', err);
@@ -77,17 +104,23 @@ exports.resendOtp = async (req, res) => {
   }
 };
 
-// Terminate session (set status inactive)
+// ===== TERMINATE SESSION =====
 exports.terminateSession = async (req, res) => {
   const { user_id } = req.body;
+
   if (!user_id) {
     return res.status(400).json({ success: false, error: 'user_id is required.' });
   }
+
   try {
     await db.execute(
-      `UPDATE login_history SET status = 'inactive', logout_time = UNIX_TIMESTAMP() WHERE user_id = ? AND status = 'success' ORDER BY login_time DESC LIMIT 1`,
+      `UPDATE login 
+       SET status = 'Inactive', logout_time = UNIX_TIMESTAMP() 
+       WHERE user_id = ? AND status = 'Active' 
+       ORDER BY login_date DESC LIMIT 1`,
       [user_id]
     );
+
     res.json({ success: true, message: 'Session terminated.' });
   } catch (err) {
     console.error('Error in terminateSession:', err);
