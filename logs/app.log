@@ -16,3 +16,18 @@
 [2025-09-15T12:39:32.472Z] INFO: User registered: {"id":"USR008","name":"rayapudi","role":"Admin","mobileNumber":"8686067277","email":"kiran1@gmail.com"}
 [2025-09-15T12:48:40.214Z] INFO: User registered: {"id":"USR009","name":"kiranr","role":"Manager","mobileNumber":"9618796996","email":"kiran2@gmail.com"}
 [2025-09-15T17:54:12.384Z] INFO: User registered: {"id":"USR010","name":"sai","role":"Manager","mobileNumber":"9441391430","email":"sai@gamil.com"}
+[2025-09-17T12:42:27.104Z] ERROR: Error registering user: Table 'inventory.user' doesn't exist
+[2025-09-17T12:42:46.051Z] ERROR: Error registering user: Table 'inventory.user' doesn't exist
+[2025-09-17T12:49:54.658Z] ERROR: Error registering user: Duplicate entry 'USR002' for key 'PRIMARY'
+[2025-09-17T12:50:16.744Z] ERROR: Error registering user: Duplicate entry 'USR002' for key 'PRIMARY'
+[2025-09-17T12:53:33.062Z] INFO: User registered: {"id":"USR003","name":"Bob Johnson","role":"User","mobileNumber":"9123456790","email":"bob@example.com"}
+[2025-09-18T11:26:16.627Z] INFO: User registered: {"id":"USR004","name":"Kiran","role":"Manager","mobileNumber":"9618796996","email":"kioran@gmai.com","status":"Active"}
+[2025-09-18T11:26:52.379Z] INFO: User registered: {"id":"USR005","name":"Test User","role":"Admin","mobileNumber":"9876543214","email":"test@example.com","status":"Active"}
+[2025-09-18T11:27:44.105Z] INFO: User registered: {"id":"USR006","name":"katam","role":"Manager","mobileNumber":"8686067277","email":"kiran@gmai.com","status":"Active"}
+[2025-09-18T11:29:03.378Z] INFO: User registered: {"id":"USR007","name":"rgrg","role":"Manager","mobileNumber":"8686067278","email":"erfre@gmail.com","status":"Active"}
+[2025-09-18T11:52:21.662Z] INFO: User registered: {"id":"USR008","name":"wdwqd","role":"Admin","mobileNumber":"8686067288","email":"kiran@gmail.com","status":"Active"}
+[2025-09-18T12:16:41.785Z] INFO: User registered: {"id":"USR009","name":"wqecwqdc","role":"Staff","mobileNumber":"8686067271","email":"kiran2@gmail.com","status":"Active"}
+[2025-09-18T12:47:55.701Z] INFO: User registered: {"id":"USR010","name":"sai","role":"Manager","mobileNumber":"7856925855","email":"sai2@gmail.com","status":"Active"}
+[2025-09-19T05:01:36.254Z] INFO: User registered: {"id":"USR011","name":"Test User","role":"Admin","mobileNumber":"8876543210","email":"test1@example.com","status":"Active"}
+[2025-09-19T05:46:32.041Z] INFO: User registered: {"id":"USR012","name":"vamsi","role":"Manager","mobileNumber":"9494564568","email":"vamsi@gmai.com","status":"Active"}
+[2025-09-19T10:06:32.221Z] INFO: User registered: {"id":"USR393278","name":"Pavan","role":"Manager","mobileNumber":"9856123545","email":"pavan@gmail.com","status":"Active"}

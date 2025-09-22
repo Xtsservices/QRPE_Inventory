@@ -1,12 +1,13 @@
 const db = require('../db');
+const queries = require('../Queries/dashboardQuery');
 
 // Get dashboard counts and alert names
 exports.getDashboardCounts = async (req, res) => {
   try {
-    const [[itemCount]] = await db.execute('SELECT COUNT(*) AS item_count FROM item_master');
-    const [[vendorCount]] = await db.execute('SELECT COUNT(*) AS vendor_count FROM vendor');
-    const [[alertCount]] = await db.execute('SELECT COUNT(*) AS alert_count FROM alert');
-    const [alertNames] = await db.execute('SELECT alert_name FROM alert');
+    const [[itemCount]] = await db.execute(queries.itemCount);
+    const [[vendorCount]] = await db.execute(queries.vendorCount);
+    const [[alertCount]] = await db.execute(queries.alertCount);
+    const [alertNames] = await db.execute(queries.alertNames);
 
     res.json({
       success: true,

@@ -1,260 +1,181 @@
 const db = require("../db");
+const orderQueries = require("../Queries/orderQuery");
 
-// ----------------- Create Order -----------------
+// ----------------- CREATE ORDER -----------------
 exports.createOrder = async (req, res) => {
-  let { vendorName, vendorId, date, items, status, totalAmount, notes } = req.body;
+  const { vendor_name, date, items, status } = req.body;
 
-  // Normalize values
-  vendorName = vendorName ?? null;
-  vendorId = vendorId ?? null;
-  date = date ?? new Date();
-  items = items ?? [];
-  status = status ?? "Pending";
-  totalAmount = totalAmount ?? 0;
-  notes = notes ?? "";
-
-  if (!vendorName || !vendorId || !items.length) {
+  if (!vendor_name || !items || !items.length) {
     return res.status(400).json({
       success: false,
-      error: "vendorName, vendorId and items are required.",
+      error: "Vendor name and at least one item are required",
     });
   }
 
+  const conn = await db.getConnection();
   try {
-    const itemCount = items.length;
-    const itemsJSON = JSON.stringify(items);
+    await conn.beginTransaction();
 
-    // Insert order with vendor_id
-    const [result] = await db.execute(
-      `INSERT INTO orders (vendor_name, vendor_id, date, item_count, status, amount, notes, items, created_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, UNIX_TIMESTAMP())`,
-      [vendorName, vendorId, date, itemCount, status, totalAmount, notes, itemsJSON]
-    );
+    // Insert order with initial total = 0
+    const [orderResult] = await conn.query(orderQueries.insertOrder, [
+      vendor_name,
+      date || new Date(),
+      status || "Pending",
+      0,
+    ]);
 
-    // Generate order_id
-    const order_id = "ORD" + result.insertId.toString().padStart(3, "0");
+    const orderId = orderResult.insertId;
+    let total = 0;
 
-    // Update row with order_id
-await db.execute(
-  `UPDATE orders 
-   SET vendor_name=?, vendor_id=?, date=?, item_count=?, status=?, amount=?, notes=?, items=?, updated_date=UNIX_TIMESTAMP()
-   WHERE order_id=?`,
-  [
-    vendorName,
-    vendorId,
-    date,
-    itemCount,
-    status,
-    totalAmount,
-    notes,
-    itemsJSON,
-    order_id,
-  ]
-);
-
-    // Update stock
+    // Insert items & calculate total
     for (const item of items) {
-      const { id: item_id, quantity, cost } = item;
+      const itemName = item.item_name || item.name;
+      const unit = item.unit || null;
+      const quantity = Number(item.quantity) || 0;
+      const price = Number(item.price) || 0;
 
-      const [existing] = await db.execute(
-        `SELECT stock_id, quantity FROM stock WHERE item_id=? AND vendor_id=?`,
-        [item_id, vendorId]
-      );
+      if (!itemName)
+        throw new Error("Item name is required for each order item");
 
-      if (existing.length > 0) {
-        await db.execute(
-          `UPDATE stock SET quantity = quantity + ?, updated_date=UNIX_TIMESTAMP() WHERE stock_id=?`,
-          [quantity, existing[0].stock_id]
-        );
-      } else {
-        await db.execute(
-          `INSERT INTO stock (item_id, quantity, cost, vendor_id, created_date)
-           VALUES (?, ?, ?, ?, UNIX_TIMESTAMP())`,
-          [item_id, quantity, cost || 0, vendorId]
-        );
-      }
+      total += quantity * price;
+
+      await conn.query(orderQueries.insertOrderItem, [
+        orderId,
+        itemName,
+        unit,
+        quantity,
+        price,
+      ]);
     }
 
+    // Update total in orders table
+    await conn.query("UPDATE orders SET total = ? WHERE order_id = ?", [
+      total,
+      orderId,
+    ]);
+
+    await conn.commit();
     res.status(201).json({
       success: true,
-      order: {
-        id: order_id,
-        vendorName,
-        vendorId,
-        date,
-        itemCount,
-        status,
-        totalAmount,
-        notes,
-        items,
-      },
+      message: "Order created successfully",
+      order_id: orderId,
     });
-  } catch (err) {
-    console.error("Error creating order:", err);
-    res.status(500).json({ success: false, error: "Internal server error" });
+  } catch (error) {
+    await conn.rollback();
+    res.status(500).json({ success: false, error: error.message });
+  } finally {
+    conn.release();
   }
 };
 
-// ----------------- Get All Orders -----------------
-exports.getOrders = async (req, res) => {
-  try {
-    const [rows] = await db.execute(
-      `SELECT o.order_id, o.vendor_id, o.vendor_name, v.contact_person, v.contact_mobile, 
-              o.date, o.item_count, o.status, o.amount, o.notes, o.items 
-       FROM orders o
-       LEFT JOIN vendors v ON o.vendor_id = v.vendor_id
-       ORDER BY o.created_date DESC`
-    );
-
-    const data = rows.map((row) => ({
-      id: row.order_id,
-      vendorId: row.vendor_id,
-      vendorName: row.vendor_name,
-      vendorContact: row.contact_person,
-      vendorMobile: row.contact_mobile,
-      date: row.date,
-      itemCount: row.item_count,
-      status: row.status,
-      totalAmount: row.amount,
-      notes: row.notes,
-      items: JSON.parse(row.items),
-    }));
-
-    res.json({ success: true, data });
-  } catch (err) {
-    console.error("Error fetching orders:", err);
-    res.status(500).json({ success: false, error: "Internal server error" });
-  }
-};
-
-// ----------------- Get Single Order -----------------
-exports.getOrderById = async (req, res) => {
-  const { order_id } = req.params;
-
-  try {
-    const [rows] = await db.execute(
-      `SELECT o.order_id, o.vendor_id, o.vendor_name, v.contact_person, v.contact_mobile,
-              o.date, o.item_count, o.status, o.amount, o.notes, o.items
-       FROM orders o
-       LEFT JOIN vendors v ON o.vendor_id = v.vendor_id
-       WHERE o.order_id=?`,
-      [order_id]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({ success: false, error: "Order not found" });
-    }
-
-    const row = rows[0];
-    const order = {
-      id: row.order_id,
-      vendorId: row.vendor_id,
-      vendorName: row.vendor_name,
-      vendorContact: row.contact_person,
-      vendorMobile: row.contact_mobile,
-      date: row.date,
-      itemCount: row.item_count,
-      status: row.status,
-      totalAmount: row.amount,
-      notes: row.notes,
-      items: JSON.parse(row.items),
-    };
-
-    res.json({ success: true, data: order });
-  } catch (err) {
-    console.error("Error fetching order:", err);
-    res.status(500).json({ success: false, error: "Internal server error" });
-  }
-};
-
-// ----------------- Update Order -----------------
+// ----------------- UPDATE ORDER -----------------
 exports.updateOrder = async (req, res) => {
   const { order_id } = req.params;
-  let { vendorName, vendorId, date, items, status, totalAmount, notes } = req.body;
+  const { vendor_name, status, items } = req.body;
 
-  // 🔹 Normalize inputs (convert undefined → null or default values)
-  vendorName = vendorName ?? null;
-  vendorId = vendorId ?? null;
-  date = date ?? new Date();
-  items = items ?? [];
-  status = status ?? "Pending";
-  totalAmount = totalAmount ?? 0;
-  notes = notes ?? "";
-
-  try {
-    const itemCount = items.length;
-    const itemsJSON = JSON.stringify(items);
-
-    // Debugging: see what values you're sending
-    console.log({
-      vendorName,
-      vendorId,
-      date,
-      itemCount,
-      status,
-      totalAmount,
-      notes,
-      itemsJSON,
-      order_id
-    });
-
-    await db.execute(
-      `UPDATE orders 
-       SET vendor_name=?, vendor_id=?, date=?, item_count=?, status=?, amount=?, notes=?, items=?, updated_date=UNIX_TIMESTAMP()
-       WHERE order_id=?`,
-      [
-        vendorName,
-        vendorId,
-        date,
-        itemCount,
-        status,
-        totalAmount,
-        notes,
-        itemsJSON,
-        order_id,
-      ]
-    );
-
-    res.json({ success: true, message: "Order updated successfully" });
-  } catch (err) {
-    console.error("Error updating order:", err);
-    res.status(500).json({ success: false, error: "Internal server error" });
+  if (!order_id) {
+    return res.status(400).json({ success: false, error: "Order ID required" });
   }
-};
+  if (!items || !items.length) {
+    return res
+      .status(400)
+      .json({ success: false, error: "At least one item required" });
+  }
 
-
-// ----------------- Delete Order -----------------
-exports.deleteOrder = async (req, res) => {
-  const { order_id } = req.params;
-
+  const conn = await db.getConnection();
   try {
-    // Get old order
-    const [oldRows] = await db.execute(
-      `SELECT items, vendor_id FROM orders WHERE order_id=?`,
-      [order_id]
-    );
+    await conn.beginTransaction();
 
-    if (oldRows.length === 0) {
-      return res.status(404).json({ success: false, error: "Order not found" });
-    }
+    // Delete old items
+    await conn.query("DELETE FROM order_items WHERE order_id = ?", [order_id]);
 
-    const oldOrder = oldRows[0];
-    const oldItems = JSON.parse(oldOrder.items);
+    let total = 0;
+    // Insert updated items & recalc total
+    for (const item of items) {
+      const itemName = item.item_name || item.item;
+      const unit = item.unit || null;
+      const quantity = Number(item.quantity) || 0;
+      const price = Number(item.price) || 0;
 
-    // Rollback stock
-    for (const item of oldItems) {
-      await db.execute(
-        `UPDATE stock SET quantity = quantity - ? WHERE item_id=? AND vendor_id=?`,
-        [item.quantity, item.id, oldOrder.vendor_id]
+      if (!itemName)
+        throw new Error("Item name is required for each order item");
+
+      total += quantity * price;
+
+      await conn.query(
+        "INSERT INTO order_items (order_id, item_name, unit, quantity, price) VALUES (?, ?, ?, ?, ?)",
+        [order_id, itemName, unit, quantity, price]
       );
     }
 
-    // Delete order
-    await db.execute(`DELETE FROM orders WHERE order_id=?`, [order_id]);
+    // Update orders table
+    await conn.query(
+      "UPDATE orders SET vendor_name = ?, status = ?, total = ? WHERE order_id = ?",
+      [vendor_name, status, total, order_id]
+    );
 
-    res.json({ success: true, message: "Order deleted successfully" });
+    await conn.commit();
+    res.json({ success: true, message: "Order updated successfully" });
   } catch (err) {
-    console.error("Error deleting order:", err);
-    res.status(500).json({ success: false, error: "Internal server error" });
+    await conn.rollback();
+    console.error(err);
+    res.status(500).json({ success: false, error: err.message });
+  } finally {
+    conn.release();
+  }
+};
+
+// ----------------- GET ALL ORDERS -----------------
+exports.getOrders = async (req, res) => {
+  try {
+    const [rows] = await db.query(orderQueries.getAllOrders);
+
+    const orders = rows.map((r) => ({
+      ...r,
+      items: JSON.parse(r.items || "[]"),
+    }));
+
+    res.json({ success: true, data: orders });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ----------------- GET ORDER BY ID -----------------
+exports.getOrderById = async (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const [rows] = await db.query(orderQueries.getOrderById, [order_id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Order not found or deleted",
+      });
+    }
+
+    const order = rows[0];
+    order.items = JSON.parse(order.items || "[]");
+
+    res.json({ success: true, data: order });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ----------------- SOFT DELETE ORDER -----------------
+exports.deleteOrder = async (req, res) => {
+  const { order_id } = req.params;
+  try {
+    const [result] = await db.query(orderQueries.softDeleteOrder, [order_id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Order not found or already deleted",
+      });
+    }
+    res.json({ success: true, message: "Order deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 };
