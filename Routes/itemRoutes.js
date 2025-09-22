@@ -3,10 +3,10 @@ const router = express.Router();
 const itemController = require("../controllers/itemcontroller");
 
 // All routes are public (no JWT required)
-router.get("/", itemController.getAllItems);
-router.get("/:id", itemController.getItemById);
 router.post("/", itemController.createItem);
-router.put("/:id", itemController.updateItem);
-router.delete("/:id", itemController.deleteItem);
+router.get("/", itemController.getAllItems);
+router.get("/:item_id", itemController.getItemById);
+router.put("/:item_id", itemController.updateItem);
+router.delete("/:item_id", itemController.deleteItem);
 
 module.exports = router;

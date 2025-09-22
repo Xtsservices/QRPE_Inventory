@@ -1,8 +1,8 @@
 module.exports = {
   CREATE_ITEM: `
     INSERT INTO item_master
-    (item_name, type, status_id, units, kg, grams, litres, cost)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    (name, type, unit, quantities, cost, status_id)
+    VALUES (?, ?, ?, ?, ?, ?)
   `,
 
   GET_ALL_ITEMS: `
@@ -14,7 +14,9 @@ module.exports = {
   `,
 
   UPDATE_ITEM: (updateFields) => `
-    UPDATE item_master SET ${updateFields.join(", ")} WHERE item_id = ?
+    UPDATE item_master
+    SET ${updateFields.join(", ")}, updated_at = NOW()
+    WHERE item_id = ?
   `,
 
   SOFT_DELETE_ITEM: `

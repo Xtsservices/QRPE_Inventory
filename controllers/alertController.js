@@ -28,6 +28,7 @@ exports.updateAlert = async (req, res) => {
 };
 
 // Get all alerts
+
 exports.getAlerts = async (req, res) => {
   try {
     const [rows] = await alertQuery.getAllAlerts();
