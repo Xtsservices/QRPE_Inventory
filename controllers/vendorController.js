@@ -1,11 +1,23 @@
 const db = require("../db");
 const queries = require("../Queries/vendorQuery");
+const { vendorSchema, updateVendorSchema } = require("../Validations/vendorValidation");
 
 // Map status → status text
-const statusMap = { 1: "Active", 2: "Inactive" };
+const statusMap = {
+   1: "Active", 
+   2: "Inactive" 
+  };
 
 // ===== CREATE VENDOR =====
 exports.createVendor = async (req, res) => {
+  const { error, value } = vendorSchema.validate(req.body, { abortEarly: false });
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details.map((e) => e.message),
+    });
+  }
+
   const {
     vendor_name,
     license_number,
@@ -16,28 +28,9 @@ exports.createVendor = async (req, res) => {
     contact_email,
     mobile_number,
     full_address,
-  } = req.body;
+  } = value;
 
-  // default status = Active
-  const status = 1;
-
-  if (
-    !vendor_name ||
-    !license_number ||
-    !gst_number ||
-    !pan_number ||
-    !contact_person ||
-    !contact_mobile ||
-    !contact_email ||
-    !mobile_number ||
-    !full_address
-  ) {
-    return res.status(400).json({
-      success: false,
-      error:
-        "All fields are required: vendor_name, license_number, gst_number, pan_number, contact_person, contact_mobile, contact_email, mobile_number, full_address.",
-    });
-  }
+  const status = 1; // default active
 
   try {
     const [result] = await db.execute(queries.CREATE_VENDOR, [
@@ -117,71 +110,28 @@ exports.getVendorById = async (req, res) => {
   }
 };
 
-// ===== UPDATE VENDOR (status cannot be changed) =====
+// ===== UPDATE VENDOR =====
 exports.updateVendor = async (req, res) => {
   const { vendor_id } = req.params;
-  const {
-    vendor_name,
-    license_number,
-    gst_number,
-    pan_number,
-    contact_person,
-    contact_mobile,
-    contact_email,
-    mobile_number,
-    full_address,
-  } = req.body;
+
+  const { error, value } = updateVendorSchema.validate(req.body, { abortEarly: false });
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.details.map((e) => e.message),
+    });
+  }
 
   if (!vendor_id) {
-    return res
-      .status(400)
-      .json({ success: false, error: "Vendor ID is required" });
+    return res.status(400).json({ success: false, error: "Vendor ID is required" });
   }
 
   const updateFields = [];
   const params = [];
 
-  if (vendor_name) {
-    updateFields.push("vendor_name=?");
-    params.push(vendor_name);
-  }
-  if (license_number) {
-    updateFields.push("license_number=?");
-    params.push(license_number);
-  }
-  if (gst_number) {
-    updateFields.push("gst_number=?");
-    params.push(gst_number);
-  }
-  if (pan_number) {
-    updateFields.push("pan_number=?");
-    params.push(pan_number);
-  }
-  if (contact_person) {
-    updateFields.push("contact_person=?");
-    params.push(contact_person);
-  }
-  if (contact_mobile) {
-    updateFields.push("contact_mobile=?");
-    params.push(contact_mobile);
-  }
-  if (contact_email) {
-    updateFields.push("contact_email=?");
-    params.push(contact_email);
-  }
-  if (mobile_number) {
-    updateFields.push("mobile_number=?");
-    params.push(mobile_number);
-  }
-  if (full_address) {
-    updateFields.push("full_address=?");
-    params.push(full_address);
-  }
-
-  if (!updateFields.length) {
-    return res
-      .status(400)
-      .json({ success: false, error: "No fields to update" });
+  for (let key in value) {
+    updateFields.push(`${key}=?`);
+    params.push(value[key]);
   }
 
   params.push(vendor_id);
@@ -193,9 +143,7 @@ exports.updateVendor = async (req, res) => {
     );
 
     if (result.affectedRows === 0) {
-      return res
-        .status(404)
-        .json({ success: false, error: "Vendor not found" });
+      return res.status(404).json({ success: false, error: "Vendor not found" });
     }
 
     res.json({ success: true, message: "Vendor updated successfully" });

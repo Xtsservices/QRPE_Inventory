@@ -9,42 +9,22 @@ const statusMap = {
 
 // ===== CREATE ITEM =====
 exports.createItem = async (req, res) => {
-  let { name, type, unit, quantity, cost, status_id } = req.body;
-
-  name = name?.trim() ?? null;
-  type = type?.trim() ?? null;
-  unit = unit?.trim() ?? null;
-  quantity = quantity ?? 0;
-  cost = cost ?? 0;
-  status_id = status_id ?? 1;
-
-  if (!name || !type || !unit) {
-    return res
-      .status(400)
-      .json({ success: false, error: "Name, type and unit are required." });
-  }
-
-  if (quantity <= 0) {
-    return res
-      .status(400)
-      .json({ success: false, error: "Quantity must be greater than 0." });
-  }
-
   try {
-    const [result] = await db.execute(
-      `INSERT INTO item_master (name, type, unit, quantity, cost, status_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-       [name, type, unit, quantity, cost, status_id]
-    );
+    const { name, type, units, quantity, cost, status_id } = req.body;
 
+   const [result] = await db.query(
+  queries.CREATE_ITEM,
+  [name, type, status_id, quantity, units, cost]
+);
     res.status(201).json({
       success: true,
       data: {
         item_id: result.insertId,
         name,
         type,
-        unit,
+        units,
         quantity,
+        quantity_with_unit: `${quantity}${units}`,
         cost,
         status_id,
         status: statusMap[status_id] || "Unknown",
@@ -61,12 +41,13 @@ exports.getAllItems = async (req, res) => {
   try {
     const [rows] = await db.execute(queries.GET_ALL_ITEMS);
 
-     const items = rows.map((item) => ({
+    const items = rows.map((item) => ({
       item_id: item.item_id,
       name: item.name,
       type: item.type,
-      unit: item.unit,
-      quantity: item.quantity,
+      units: item.units,
+      // overwrite quantity with combined value
+      quantity_with_unit: item.quantity_with_unit,
       cost: item.cost,
       status_id: item.status_id,
       status: statusMap[item.status_id] || "Unknown",
@@ -91,7 +72,14 @@ exports.getItemById = async (req, res) => {
     res.json({
       success: true,
       data: {
-        ...row,
+        item_id: row.item_id,
+        name: row.name,
+        type: row.type,
+        // overwrite quantity with combined value
+        quantity_with_unit: row.quantity_with_unit,
+        units: row.units,
+        cost: row.cost,
+        status_id: row.status_id,
         status: statusMap[row.status_id] || "Unknown",
       },
     });
@@ -104,42 +92,23 @@ exports.getItemById = async (req, res) => {
 // ===== UPDATE ITEM =====
 exports.updateItem = async (req, res) => {
   try {
-   const { item_id } = req.params; 
-   const { name, type, unit, quantity, cost, status_id } = req.body;
-
-    if (!item_id) {
-      return res
-        .status(400)
-        .json({ success: false, error: "Item ID is required" });
-    }
-
-   if (
-      name === undefined &&
-      type === undefined &&
-      unit === undefined &&
-      quantity === undefined &&
-      cost === undefined &&
-      status_id === undefined
-    ) {
-      return res
-        .status(400)
-        .json({ success: false, error: "No fields to update" });
-    }
+    const { item_id } = req.params;
+    const { name, type, units, quantity, cost, status_id } = req.body;
 
     let updateFields = [];
     let params = [];
 
     if (name !== undefined) {
       updateFields.push("name = ?");
-      params.push(name.trim());
+      params.push(name);
     }
     if (type !== undefined) {
-      updateFields.push("type = ?");
-      params.push(type.trim());
+      updateFields.push("`type` = ?");
+      params.push(type);
     }
-    if (unit !== undefined) {
-      updateFields.push("unit = ?");
-      params.push(unit.trim());
+    if (units !== undefined) {
+      updateFields.push("units = ?");
+      params.push(units);
     }
     if (quantity !== undefined) {
       updateFields.push("quantity = ?");
@@ -154,6 +123,11 @@ exports.updateItem = async (req, res) => {
       params.push(status_id);
     }
 
+     // no fields to update
+    if (updateFields.length === 0) {
+      return res.status(400).json({ success: false, error: "No fields to update" });
+    }
+
     params.push(item_id);
 
     const sql = queries.UPDATE_ITEM(updateFields);
@@ -163,7 +137,13 @@ exports.updateItem = async (req, res) => {
       return res.status(404).json({ success: false, error: "Item not found" });
     }
 
-    return res.json({ success: true, message: "Item updated successfully" });
+    const [rows] = await db.query(queries.GET_ITEM_BY_ID, [item_id]);
+    const updated = rows[0];
+
+    return res.json({
+      success: true,
+      data: updated, // ✅ directly return row (already includes type, quantity_with_unit, status etc.)
+    });
   } catch (err) {
     console.error("Error updating item:", err);
     return res.status(500).json({ success: false, error: "Server Error" });

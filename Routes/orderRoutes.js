@@ -1,12 +1,36 @@
 const express = require("express");
 const router = express.Router();
 const orderController = require("../controllers/orderController");
+const validate = require("../middlewares/validate");
+const {
+  createOrderSchema,
+  updateOrderSchema,
+  orderIdParamSchema,
+} = require("../Validations/orderValidation");
 
-router.post("/", orderController.createOrder); // ✅ create route
-router.post("/orders", orderController.createOrder);
+// Create
+router.post("/", validate(createOrderSchema), orderController.createOrder);
+
+// Update
+router.put("/:order_id", 
+  validate(orderIdParamSchema, "params"), 
+  validate(updateOrderSchema), 
+  orderController.updateOrder
+);
+
+// Get all
 router.get("/", orderController.getOrders);
-router.get("/order_id", orderController.getOrderById);
-router.put("/:order_id", orderController.updateOrder);
-//router.delete("/:id", orderController.deleteOrder);
+
+// Get by ID
+router.get("/:order_id", 
+  validate(orderIdParamSchema, "params"), 
+  orderController.getOrderById
+);
+
+// Delete
+router.delete("/:order_id", 
+  validate(orderIdParamSchema, "params"), 
+  orderController.deleteOrder
+);
 
 module.exports = router;

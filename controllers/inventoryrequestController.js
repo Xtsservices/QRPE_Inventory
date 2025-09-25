@@ -1,24 +1,23 @@
-// controllers/inventoryrequestController.js
 const db = require("../db");
+const { createRequestSchema, updateRequestSchema } = require("../Validations/inventoryrequestValidation");
 
-// =============================
 // CREATE REQUEST (with items)
-// =============================
 exports.createRequest = async (req, res) => {
-  const { requested_by, items } = req.body;
-
-  if (!requested_by || !items || items.length === 0) {
-    return res
-      .status(400)
-      .json({ error: "Requested_by and items are required" });
+  const { error } = createRequestSchema.validate(req.body, { abortEarly: false });
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      errors: error.details.map((err) => err.message)
+    });
   }
+
+  const { requested_by, items } = req.body;
 
   try {
     // Calculate totals
     const total_price = items.reduce((sum, item) => sum + (item.price || 0), 0);
     const item_count = items.length;
 
-    // Insert into requests
     const [result] = await db.query(
       `INSERT INTO inventory_requests (requested_by, total_price, item_count) 
        VALUES (?, ?, ?)`,
@@ -27,7 +26,6 @@ exports.createRequest = async (req, res) => {
 
     const requestId = result.insertId;
 
-    // Insert items
     for (const item of items) {
       await db.query(
         `INSERT INTO inventory_request_items (request_id, item_name, quantity, price) 
@@ -43,9 +41,7 @@ exports.createRequest = async (req, res) => {
   }
 };
 
-// =============================
 // GET ALL REQUESTS
-// =============================
 exports.getRequests = async (req, res) => {
   try {
     const [requests] = await db.query(
@@ -71,9 +67,7 @@ exports.getRequests = async (req, res) => {
   }
 };
 
-// =============================
 // GET SINGLE REQUEST
-// =============================
 exports.getRequestById = async (req, res) => {
   try {
     const requestId = req.params.id;
@@ -106,15 +100,20 @@ exports.getRequestById = async (req, res) => {
   }
 };
 
-// =============================
 // UPDATE REQUEST
-// =============================
 exports.updateRequest = async (req, res) => {
+  const { error } = updateRequestSchema.validate(req.body, { abortEarly: false });
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      errors: error.details.map((err) => err.message)
+    });
+  }
+
   const requestId = req.params.id;
   const { requested_by, items } = req.body;
 
   try {
-    // Update main request
     await db.query(
       `UPDATE inventory_requests 
        SET requested_by = ? 
@@ -123,13 +122,11 @@ exports.updateRequest = async (req, res) => {
     );
 
     if (items && items.length > 0) {
-      // Remove old items
       await db.query(
         `DELETE FROM inventory_request_items WHERE request_id = ?`,
         [requestId]
       );
 
-      // Insert new items
       for (const item of items) {
         await db.query(
           `INSERT INTO inventory_request_items (request_id, item_name, quantity, price) 

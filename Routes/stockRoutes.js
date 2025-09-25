@@ -1,10 +1,25 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const stockController = require('../controllers/stockController');
+const stockController = require("../controllers/stockController");
+const validate = require("../middlewares/validate");
+const {
+  createStockSchema,
+  updateStockSchema,
+  stockIdParamSchema,
+} = require("../Validations/stockValidation");
 
-router.post('/stocks', stockController.createStock);
-router.get('/', stockController.getStocks);
-router.put('/stocks/:stock_id', stockController.updateStock);
-//router.delete('/stocks/:stock_id', stockController.deleteStock);
+// Create stock
+router.post("/", validate(createStockSchema), stockController.createStock);
+
+// Get all stocks
+router.get("/", stockController.getStocks);
+
+// Update stock
+router.put(
+  "/:stock_id",
+  validate(stockIdParamSchema, "params"),
+  validate(updateStockSchema),
+  stockController.updateStock
+);
 
 module.exports = router;
