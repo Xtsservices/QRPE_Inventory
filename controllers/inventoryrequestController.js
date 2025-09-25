@@ -7,39 +7,63 @@ const db = require("../db");
 exports.createRequest = async (req, res) => {
   const { requested_by, items } = req.body;
 
-  if (!requested_by || !items || items.length === 0) {
-    return res
-      .status(400)
-      .json({ error: "Requested_by and items are required" });
+  if (!requested_by || !items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: "requested_by and items are required" });
   }
 
+  let conn;
   try {
-    // Calculate totals
-    const total_price = items.reduce((sum, item) => sum + (item.price || 0), 0);
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    // Validate availability first & compute totals (prevent partial writes)
+    let total_price = 0;
+    for (const it of items) {
+      if (!it.item_id) throw new Error("item_id required for each item");
+      if (!it.item_name) throw new Error("item_name required for each item");
+      const quantity = Number(it.quantity);
+      const price = Number(it.price);
+      if (!Number.isFinite(quantity) || quantity <= 0) throw new Error(`Invalid quantity for item ${it.item_name}`);
+      if (!Number.isFinite(price) || price < 0) throw new Error(`Invalid price for item ${it.item_name}`);
+
+      // availability check
+      const [availableItems] = await conn.query(
+        `SELECT * FROM orderitems WHERE item_id = ? AND status = 'available'`,
+        [it.item_id]
+      );
+      if (availableItems.length === 0) {
+        throw new Error(`Item with item_id ${it.item_id} not available in stock`);
+      }
+      total_price += price; // (could be quantity * price if that's desired)
+    }
     const item_count = items.length;
 
-    // Insert into requests
-    const [result] = await db.query(
-      `INSERT INTO inventory_requests (requested_by, total_price, item_count, request_date) 
-   VALUES (?, ?, ?, NOW())`, // add NOW() here
+    // Insert master request row
+    const [result] = await conn.query(
+      `INSERT INTO inventory_requests (requested_by, total_price, item_count, request_date)
+       VALUES (?, ?, ?, NOW())`,
       [requested_by, total_price, item_count]
     );
-
     const requestId = result.insertId;
 
     // Insert items
-    for (const item of items) {
-      await db.query(
-        `INSERT INTO inventory_request_items (request_id, item_name, quantity, price) 
-         VALUES (?, ?, ?, ?)`,
-        [requestId, item.item_name, item.quantity, item.price]
+    for (const it of items) {
+      await conn.query(
+        `INSERT INTO inventory_request_items (request_id, item_id, item_name, quantity, price)
+         VALUES (?, ?, ?, ?, ?)`,
+        [requestId, it.item_id, it.item_name, it.quantity, it.price]
       );
     }
 
-    res.status(201).json({ message: "Request created", request_id: requestId });
+    await conn.commit();
+    return res.status(201).json({ message: "Request created", request_id: requestId, total_price, item_count });
   } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (rbErr) { console.error("Rollback failed", rbErr); } }
     console.error("Error creating request:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    const status = /not available|required|Invalid/.test(err.message) ? 400 : 500;
+    return res.status(status).json({ error: err.message });
+  } finally {
+    if (conn) conn.release();
   }
 };
 
