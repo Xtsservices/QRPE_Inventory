@@ -3,69 +3,81 @@ const orderQueries = require("../Queries/orderQuery");
 
 // ----------------- CREATE ORDER -----------------
 exports.createOrder = async (req, res) => {
-  const { vendor_name, date, items, status, notes } = req.body;
+  const { vendor_name, date, items, status, notes, vendor_id } = req.body;
 
-  if (!vendor_name || !items || !items.length) {
+  // Basic payload validation
+  if (!vendor_name || !vendor_id || !items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({
       success: false,
-      error: "Vendor name and at least one item are required",
+      error: "Vendor name, vendor ID, and at least one item are required",
     });
   }
 
-  const conn = await db.getConnection();
+  let conn;
   try {
-    await conn.beginTransaction();
+    conn = await db.getConnection();
+    await conn.beginTransaction(); // START TRANSACTION
 
-    // Insert order with initial total = 0
+    // Normalize date (if column expects DATE only you may slice(0,10))
+    const orderDate = date ? new Date(date) : new Date();
+
+    // Insert order with temporary total = 0 (will update after items processed)
     const [orderResult] = await conn.query(orderQueries.insertOrder, [
       vendor_name,
-      date || new Date(),
+      vendor_id,
+      orderDate,
       status || "Pending",
       0,
       notes || "-",
     ]);
 
     const orderId = orderResult.insertId;
-    let total = 0;
+    let total = 0; // Will accumulate quantity * price
 
-    // Insert items & calculate total
-    for (const item of items) {
-      const itemName = item.item_name || item.name;
-      const unit = item.unit || null;
-      const quantity = Number(item.quantity) || 0;
-      const price = Number(item.price) || 0;
+    for (const rawItem of items) {
+      // Extract & validate
+      const itemId = rawItem.item_id || null;
+      const itemName = rawItem.item_name || rawItem.name;
+      const unit = rawItem.unit || null;
+      const quantity = Number(rawItem.quantity);
+      const price = Number(rawItem.price); // assumed unit price
 
-      if (!itemName)
-        throw new Error("Item name is required for each order item");
+      if (!itemName) throw new Error("Item name is required for each order item");
+      if (!Number.isFinite(quantity) || quantity <= 0)
+        throw new Error(`Invalid quantity for item '${itemName}'`);
+      if (!Number.isFinite(price) || price < 0)
+        throw new Error(`Invalid price for item '${itemName}'`);
 
-      total += price;
+      const lineTotal = quantity * price;
+      total += lineTotal;
 
       await conn.query(orderQueries.insertOrderItem, [
         orderId,
+        itemId,
         itemName,
         unit,
         quantity,
-        price,
+        price, // storing unit price (line total can be derived later)
       ]);
     }
 
-    // Update total in orders table
-    await conn.query("UPDATE orders SET total = ? WHERE order_id = ?", [
-      total,
-      orderId,
-    ]);
+    // Persist computed total
+    await conn.query("UPDATE orders SET total = ? WHERE order_id = ?", [total, orderId]);
 
-    await conn.commit();
-    res.status(201).json({
+    await conn.commit(); // COMMIT
+    return res.status(201).json({
       success: true,
       message: "Order created successfully",
       order_id: orderId,
+      total,
     });
   } catch (error) {
-    await conn.rollback();
-    res.status(500).json({ success: false, error: error.message });
+    if (conn) {
+      try { await conn.rollback(); } catch (rbErr) { console.error("Rollback failed", rbErr); }
+    }
+    return res.status(500).json({ success: false, error: error.message });
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 };
 
