@@ -22,25 +22,23 @@ exports.insertBilling = `
 // Get all billing records
 exports.getBilling = `
   SELECT 
-    o.order_id,
-    o.vendor_name,   
-    o.order_date,
-    o.status AS order_status,
-    IFNULL(b.billing_id, 0) AS billing_id,
-    im.name AS item_name,   
-    COALESCE(b.quantity, oi.quantity_unit) AS quantity,
-    COALESCE(b.cost, oi.price) AS cost,
-    COALESCE(b.total,
-   CAST(REGEXP_SUBSTR(oi.quantity_unit, '^[0-9]+(?:\\.[0-9]+)?') AS DECIMAL(10,2)) * oi.price
-    ) AS total,
-    IFNULL(b.status, 'Pending') AS billing_status,
-    IFNULL(b.notes, '') AS notes
-  FROM orders o
-  LEFT JOIN billing b ON o.order_id = b.order_id
-  LEFT JOIN order_items oi ON o.order_id = oi.order_id
-  LEFT JOIN item_master im ON oi.item_name = im.name   
-  ORDER BY o.order_date DESC
-`;
+  o.order_id,
+  o.vendor_name,
+  o.date AS order_date,
+  o.status AS order_status,
+  b.billing_id,
+  oi.item_name,
+  COALESCE(b.quantity, oi.quantity) AS quantity,
+  COALESCE(b.cost, oi.price) AS cost,
+  COALESCE(b.total, oi.total) AS total, -- make sure this column exists and is correctly populated
+  IFNULL(b.status, 'Pending') AS status,
+  IFNULL(b.notes, '') AS notes
+FROM orders o
+LEFT JOIN billing b ON o.order_id = b.order_id
+LEFT JOIN order_items oi ON o.order_id = oi.order_id
+ORDER BY o.date DESC;
+
+    `;
 
 // Update billing status
 exports.updateBillingStatus = `

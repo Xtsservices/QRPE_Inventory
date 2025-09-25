@@ -19,8 +19,8 @@ exports.createRequest = async (req, res) => {
     const item_count = items.length;
 
     const [result] = await db.query(
-      `INSERT INTO inventory_requests (requested_by, total_price, item_count) 
-       VALUES (?, ?, ?)`,
+      `INSERT INTO inventory_requests (requested_by, total_price, item_count, request_date) 
+   VALUES (?, ?, ?, NOW())`, // add NOW() here
       [requested_by, total_price, item_count]
     );
 

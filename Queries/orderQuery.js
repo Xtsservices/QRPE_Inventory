@@ -1,7 +1,7 @@
 module.exports = {
   insertOrder: `
-    INSERT INTO orders (vendor_name, order_date, status, total, created_at, updated_at)
-    VALUES (?, ?, ?, ?, NOW(), NOW())
+    INSERT INTO orders (vendor_name, date, status, total, notes, is_deleted)
+    VALUES (?, ?, ?, ?, ?, 0)
   `,
 
   insertOrderItem: `
@@ -9,68 +9,71 @@ module.exports = {
     VALUES (?, ?, ?, ?, NOW(), NOW())
   `,
 
-  getAllOrders: `
-  SELECT 
-    o.order_id, 
-    o.vendor_name, 
-    o.order_date, 
-    o.status, 
-    CASE 
-      WHEN o.status = 'Pending' THEN 0.00
-      WHEN o.status = 'Completed' THEN o.total
-      ELSE o.total
-    END AS total,
-    o.created_at, 
-    o.updated_at,
-    CONCAT(
-      '[',
-      GROUP_CONCAT(
-        JSON_OBJECT(
-          'id', oi.id,
-          'item_name', oi.item_name,
-          'quantity_unit', oi.quantity_unit,
-          'price', oi.price
-        )
-      ),
-      ']'
-    ) AS items
-  FROM orders o
-  LEFT JOIN order_items oi ON o.order_id = oi.order_id
-  WHERE o.is_deleted = 0
-  GROUP BY o.order_id
-  ORDER BY o.created_at DESC
-`,
+  // Delete items for update
+  deleteOrderItems: `
+    DELETE FROM order_items WHERE order_id = ?
+  `,
 
-getOrderById: `
-  SELECT 
-    o.order_id, 
-    o.vendor_name, 
-    o.order_date, 
-    o.status, 
-    CASE 
-      WHEN o.status = 'Pending' THEN 0.00
-      WHEN o.status = 'Completed' THEN o.total
-      ELSE o.total
-    END AS total,
-    o.created_at, 
-    o.updated_at,
-    CONCAT(
-      '[',
-      GROUP_CONCAT(
-        JSON_OBJECT(
-          'id', oi.id,
-          'item_name', oi.item_name,
-          'quantity_unit', oi.quantity_unit,
-          'price', oi.price
-        )
-      ),
-      ']'
-    ) AS items
-  FROM orders o
-  LEFT JOIN order_items oi ON o.order_id = oi.order_id
-  WHERE o.order_id = ? AND o.is_deleted = 0
-  GROUP BY o.order_id
-`,
+  // Get all orders with items as JSON string
+  getAllOrders: `
+    SELECT 
+      o.order_id,
+      o.vendor_name,
+      o.date,
+      o.status,
+      o.total,
+     COALESCE(o.notes,'-') AS notes,
+      CONCAT('[', 
+        IFNULL(
+          GROUP_CONCAT(
+            CONCAT(
+              '{"item":"', REPLACE(IFNULL(oi.item_name,''), '"','\\"'), '"',
+              ',"quantity":', IFNULL(oi.quantity,0),
+              ',"unit":"', IFNULL(oi.unit,''), '"',
+              ',"price":', IFNULL(oi.price,0),
+              '}'
+            )
+            SEPARATOR ','
+          ), 
+          ''
+        ),
+      ']') AS items
+    FROM orders o
+    LEFT JOIN order_items oi ON o.order_id = oi.order_id
+    WHERE o.is_deleted = 0
+    GROUP BY o.order_id
+    ORDER BY o.date DESC
+  `,
+
+  // Get single order by ID
+  getOrderById: `
+    SELECT 
+      o.order_id,
+      o.vendor_name,
+      o.date,
+      o.status,
+      o.total,
+      o.notes,
+      CONCAT('[', 
+        IFNULL(
+          GROUP_CONCAT(
+            CONCAT(
+              '{"item":"', REPLACE(IFNULL(oi.item_name,''), '"','\\"'), '"',
+              ',"quantity":', IFNULL(oi.quantity,0),
+              ',"unit":"', IFNULL(oi.unit,''), '"',
+              ',"price":', IFNULL(oi.price,0),
+              '}'
+            )
+            SEPARATOR ','
+          ), 
+          ''
+        ),
+      ']') AS items
+    FROM orders o
+    LEFT JOIN order_items oi ON o.order_id = oi.order_id
+    WHERE o.order_id = ? AND o.is_deleted = 0
+    GROUP BY o.order_id
+  `,
 
   softDeleteOrder: `
     UPDATE orders 

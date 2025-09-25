@@ -1,10 +1,10 @@
 module.exports = {
 
   CREATE_ITEM: `
-  INSERT INTO item_master
-  (name, \`type\`, status_id, quantity, units, cost, created_at, updated_at, is_deleted)
-  VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), 0)
-`,
+    INSERT INTO item_master
+    (name, type, cost, status_id, unit)
+    VALUES (?, ?, ?, ?, ?)
+  `,
 
   GET_ALL_ITEMS: `
     SELECT 
