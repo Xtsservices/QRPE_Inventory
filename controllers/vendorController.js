@@ -40,6 +40,43 @@ exports.createVendor = async (req, res) => {
   }
 
   try {
+
+    // Check if license_number already exists
+    const [existing] = await db.execute(
+      "SELECT vendor_id FROM vendors WHERE license_number = ?",
+      [license_number]
+    );
+    if (existing.length > 0) {
+      return res.status(409).json({
+      success: false,
+      error: "A vendor with this license_number already exists.",
+      });
+    }
+
+    // Check if gst_number already exists
+    const [existingGst] = await db.execute(
+      "SELECT vendor_id FROM vendors WHERE gst_number = ?",
+      [gst_number]
+    );
+    if (existingGst.length > 0) {
+      return res.status(409).json({
+      success: false,
+      error: "A vendor with this gst_number already exists.",
+      });
+    }
+
+    // Check if pan_number already exists
+    const [existingPan] = await db.execute(
+      "SELECT vendor_id FROM vendors WHERE pan_number = ?",
+      [pan_number]
+    );
+    if (existingPan.length > 0) {
+      return res.status(409).json({
+      success: false,
+      error: "A vendor with this pan_number already exists.",
+      });
+    }
+
     const [result] = await db.execute(queries.CREATE_VENDOR, [
       vendor_name,
       license_number,
