@@ -1,7 +1,7 @@
 module.exports = {
   // Insert order
   insertOrder: `
-    INSERT INTO orders (vendor_name, date, status, total, notes, is_deleted)
+    INSERT INTO orders (vendor_name, vendor_id, date, status, total, notes, is_deleted)
     VALUES (?, ?, ?, ?, ?, 0)
   `,
 
