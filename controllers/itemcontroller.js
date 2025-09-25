@@ -1,5 +1,5 @@
 const db = require("../db");
-const queries = require("../Queries/itemsQuery"); // ✅ centralized queries
+const queries = require("../Queries/itemsQuery");
 
 // Map status_id → status text
 const statusMap = {
@@ -9,46 +9,36 @@ const statusMap = {
 
 // ===== CREATE ITEM =====
 exports.createItem = async (req, res) => {
-  let { name, type, units, kg, grams, litres, status_id } = req.body;
+  let { name, type, cost, status_id, unit } = req.body;
 
   name = name?.trim() ?? null;
   type = type?.trim() ?? null;
-  units = units ?? 0;
-  kg = kg ?? 0;
-  grams = grams ?? 0;
-  litres = litres ?? 0;
+  unit = unit?.trim() ?? "units";
+  cost = cost ?? 0;
   status_id = status_id ?? 1;
 
   if (!name || !type) {
-    return res
-      .status(400)
-      .json({ success: false, error: "Name and type are required." });
-  }
-
-  if (kg === 0 && grams === 0 && litres === 0 && units === 0) {
     return res.status(400).json({
       success: false,
-      error: "At least one quantity must be provided.",
+      error: "Name and type are required.",
     });
   }
 
   try {
     const [result] = await db.execute(
-      `INSERT INTO item_master (name, type, status_id, units, kg, grams, litres)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name, type, status_id, units, kg, grams, litres]
+      `INSERT INTO item_master (name, type, cost, status_id, unit)
+       VALUES (?, ?, ?, ?, ?)`,
+      [name, type, cost, status_id, unit]
     );
 
     res.status(201).json({
       success: true,
       data: {
         item_id: result.insertId,
-        name, // ✅ fixed
+        name,
         type,
-        units,
-        kg,
-        grams,
-        litres,
+        unit,
+        cost,
         status_id,
         status: statusMap[status_id] || "Unknown",
       },
@@ -66,13 +56,10 @@ exports.getAllItems = async (req, res) => {
 
     const items = rows.map((item) => ({
       item_id: item.item_id,
-      name: item.name, // ✅ use correct column
+      name: item.name,
       type: item.type,
-      units: item.units,
-      kg: item.kg,
-      grams: item.grams,
-      litres: item.litres,
       cost: item.cost,
+      unit: item.unit || "units",
       status_id: item.status_id,
       status: statusMap[item.status_id] || "Unknown",
     }));
@@ -97,6 +84,7 @@ exports.getItemById = async (req, res) => {
       success: true,
       data: {
         ...row,
+        unit: row.unit || "units",
         status: statusMap[row.status_id] || "Unknown",
       },
     });
@@ -109,17 +97,7 @@ exports.getItemById = async (req, res) => {
 // ===== UPDATE ITEM =====
 exports.updateItem = async (req, res) => {
   try {
-    const {
-      item_id,
-      name, // ✅ use name instead of item_name
-      type,
-      units,
-      kg,
-      grams,
-      litres,
-      status_id,
-      cost,
-    } = req.body;
+    const { item_id, name, type, cost, status_id, unit } = req.body;
 
     if (!item_id) {
       return res
@@ -130,12 +108,9 @@ exports.updateItem = async (req, res) => {
     if (
       name === undefined &&
       type === undefined &&
-      units === undefined &&
-      kg === undefined &&
-      grams === undefined &&
-      litres === undefined &&
+      cost === undefined &&
       status_id === undefined &&
-      cost === undefined
+      unit === undefined
     ) {
       return res
         .status(400)
@@ -153,29 +128,17 @@ exports.updateItem = async (req, res) => {
       updateFields.push("type = ?");
       params.push(type.trim());
     }
-    if (units !== undefined) {
-      updateFields.push("units = ?");
-      params.push(units);
-    }
-    if (kg !== undefined) {
-      updateFields.push("kg = ?");
-      params.push(kg);
-    }
-    if (grams !== undefined) {
-      updateFields.push("grams = ?");
-      params.push(grams);
-    }
-    if (litres !== undefined) {
-      updateFields.push("litres = ?");
-      params.push(litres);
+    if (cost !== undefined) {
+      updateFields.push("cost = ?");
+      params.push(cost);
     }
     if (status_id !== undefined) {
       updateFields.push("status_id = ?");
       params.push(status_id);
     }
-    if (cost !== undefined) {
-      updateFields.push("cost = ?");
-      params.push(cost);
+    if (unit !== undefined) {
+      updateFields.push("unit = ?");
+      params.push(unit.trim());
     }
 
     params.push(item_id);
