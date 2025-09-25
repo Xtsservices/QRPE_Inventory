@@ -58,6 +58,7 @@ exports.createOrder = async (req, res) => {
         unit,
         quantity,
         price, // storing unit price (line total can be derived later)
+        
       ]);
     }
 
@@ -86,55 +87,64 @@ exports.updateOrder = async (req, res) => {
   const { order_id } = req.params;
   const { vendor_name, status, items } = req.body;
 
-  if (!order_id) {
-    return res.status(400).json({ success: false, error: "Order ID required" });
-  }
-  if (!items || !items.length) {
-    return res
-      .status(400)
-      .json({ success: false, error: "At least one item required" });
+  if (!order_id) return res.status(400).json({ success: false, error: "Order ID required" });
+  if (!vendor_name) return res.status(400).json({ success: false, error: "Vendor name required" });
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ success: false, error: "At least one item required" });
   }
 
-  const conn = await db.getConnection();
+  let conn;
   try {
+    conn = await db.getConnection();
     await conn.beginTransaction();
 
-    // Delete old items
-    await conn.query("DELETE FROM order_items WHERE order_id = ?", [order_id]);
-
+    // Strategy: update existing items by item_id. If you also need to add new ones, detect missing item_id and insert instead.
     let total = 0;
-    // Insert updated items & recalc total
-    for (const item of items) {
-      const itemName = item.item_name || item.item;
-      const unit = item.unit || null;
-      const quantity = Number(item.quantity) || 0;
-      const price = Number(item.price) || 0;
+    for (const rawItem of items) {
+      const itemId = rawItem.item_id; // required to match existing row
+      const itemName = rawItem.item_name || rawItem.name;
+      const unit = rawItem.unit || null;
+      const quantity = Number(rawItem.quantity);
+      const price = Number(rawItem.price);
 
-      if (!itemName)
-        throw new Error("Item name is required for each order item");
+      if (!itemId) throw new Error("item_id is required to update an order item");
+      if (!itemName) throw new Error("Item name is required for each order item");
+      if (!Number.isFinite(quantity) || quantity <= 0)
+        throw new Error(`Invalid quantity for item '${itemName}'`);
+      if (!Number.isFinite(price) || price < 0)
+        throw new Error(`Invalid price for item '${itemName}'`);
 
-      total += price;
+      const lineTotal = quantity * price;
+      total += lineTotal;
 
-      await conn.query(
-        "INSERT INTO order_items (order_id, item_name, unit, quantity, price) VALUES (?, ?, ?, ?, ?)",
-        [order_id, itemName, unit, quantity, price]
+      const [updateRes] = await conn.query(
+        "UPDATE order_items SET item_name = ?, unit = ?, quantity = ?, price = ? WHERE order_id = ? AND item_id = ?",
+        [itemName, unit, quantity, price, order_id, itemId]
       );
+      if (updateRes.affectedRows === 0) {
+        // Optional: Insert if not exists (upsert behavior)
+        await conn.query(
+          "INSERT INTO order_items (order_id, item_id, item_name, unit, quantity, price) VALUES (?, ?, ?, ?, ?, ?)",
+          [order_id, itemId, itemName, unit, quantity, price]
+        );
+      }
     }
 
-    // Update orders table
     await conn.query(
       "UPDATE orders SET vendor_name = ?, status = ?, total = ? WHERE order_id = ?",
-      [vendor_name, status, total, order_id]
+      [vendor_name, status || 'Pending', total, order_id]
     );
 
     await conn.commit();
-    res.json({ success: true, message: "Order updated successfully" });
+    return res.json({ success: true, message: "Order updated successfully", order_id, total });
   } catch (err) {
-    await conn.rollback();
+    if (conn) {
+      try { await conn.rollback(); } catch (rbErr) { console.error("Rollback failed", rbErr); }
+    }
     console.error(err);
-    res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: err.message });
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 };
 
