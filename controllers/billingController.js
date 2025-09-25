@@ -1,38 +1,63 @@
-const db = require('../db'); 
-const queries = require('../Queries/billingQuery');
+const db = require("../db");
+const queries = require("../Queries/billingQuery");
 
 // Create billing
 exports.createBilling = async (req, res) => {
-  const { order_id, vendor_id, item_id, quantity, notes } = req.body;
+  const { order_id, vendor_id, item_name, notes } = req.body;
 
-  if (!order_id || !vendor_id || !item_id || !quantity) {
-    return res.status(400).json({ success: false, message: 'order_id, vendor_id, item_id, and quantity are required' });
+  if (!order_id || !vendor_id || !item_name) {
+    return res.status(400).json({
+      success: false,
+      message: "order_id, vendor_id, and item_name are required",
+    });
   }
 
   try {
     // Check order exists
     const [order] = await db.execute(queries.checkOrder, [order_id]);
-    if (!order.length) return res.status(404).json({ success: false, message: 'Order not found' });
+    if (!order.length)
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
 
     // Check vendor exists
     const [vendor] = await db.execute(queries.checkVendor, [vendor_id]);
-    if (!vendor.length) return res.status(404).json({ success: false, message: 'Vendor not found' });
+    if (!vendor.length)
+      return res
+        .status(404)
+        .json({ success: false, message: "Vendor not found" });
 
-    // Check item exists
-    const [item] = await db.execute(queries.checkItem, [item_id]);
-    if (!item.length) return res.status(404).json({ success: false, message: 'Item not found' });
+    // Get the order_item record for this order and item_name
+    const [orderItem] = await db.execute(
+      `SELECT quantity, price AS cost, total 
+   FROM order_items 
+   WHERE order_id = ? AND item_name = ?`,
+      [order_id, item_name] // or item_id if you have it
+    );
+    if (!orderItem.length)
+      return res
+        .status(404)
+        .json({ success: false, message: "Item not found in order" });
 
-    const cost = parseFloat(item[0].cost); 
-    const total = cost * quantity;
+    const { quantity, cost } = orderItem[0];
+    const total = cost;
 
+    // Insert billing record
     const [result] = await db.execute(queries.insertBilling, [
-      order_id, vendor_id, item_id, quantity, cost, total, 'Pending', notes || null
+      order_id,
+      vendor_id,
+      item_name,
+      quantity,
+      cost,
+      total, // using Option A
+      "Pending",
+      notes || null,
     ]);
 
     res.status(201).json({ success: true, billing_id: result.insertId, total });
   } catch (err) {
-    console.error('Error creating billing:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    console.error("Error creating billing:", err);
+    res.status(500).json({ success: false, error: "Internal server error" });
   }
 };
 
@@ -43,7 +68,7 @@ exports.getBilling = async (req, res) => {
 
     res.json({
       success: true,
-      data: rows
+      data: rows,
     });
   } catch (err) {
     console.error("Error fetching billing:", err);
@@ -54,22 +79,34 @@ exports.getBilling = async (req, res) => {
 // Update billing status
 exports.updateBillingStatus = async (req, res) => {
   const { billing_id } = req.params;
-  const { status } = req.body;
+  const { cost, notes } = req.body;
 
- if (!['Paid', 'Pending'].includes(status)) {
-  return res.status(400).json({ success: false, message: 'Invalid status' });
-}
+  if (!billing_id || cost === undefined) {
+    return res
+      .status(400)
+      .json({ success: false, message: "billing_id and cost are required" });
+  }
 
   try {
-    const [result] = await db.execute(queries.updateBillingStatus, [status, billing_id]);
+    const totalPerUnit = cost;
+    const [result] = await db.execute(
+      `UPDATE billing SET cost = ?, total = ?, notes = ? WHERE billing_id = ?`,
+      [cost, totalPerUnit, notes || null, billing_id]
+    );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, message: 'Billing record not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Billing record not found" });
     }
 
-    res.json({ success: true, message: 'Status updated successfully' });
+    res.json({
+      success: true,
+      message: "Billing updated successfully",
+      total: totalPerUnit,
+    });
   } catch (err) {
-    console.error('Error updating status:', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    console.error("Error updating billing:", err);
+    res.status(500).json({ success: false, error: "Internal server error" });
   }
 };

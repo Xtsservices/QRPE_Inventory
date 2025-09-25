@@ -1,8 +1,8 @@
 module.exports = {
   // Insert order
   insertOrder: `
-    INSERT INTO orders (vendor_name, date, status, total, is_deleted)
-    VALUES (?, ?, ?, ?, 0)
+    INSERT INTO orders (vendor_name, date, status, total, notes, is_deleted)
+    VALUES (?, ?, ?, ?, ?, 0)
   `,
 
   // Insert order item
@@ -16,7 +16,7 @@ module.exports = {
     DELETE FROM order_items WHERE order_id = ?
   `,
 
-  // Get all orders with items as JSON string (fallback for old MySQL)
+  // Get all orders with items as JSON string
   getAllOrders: `
     SELECT 
       o.order_id,
@@ -24,6 +24,7 @@ module.exports = {
       o.date,
       o.status,
       o.total,
+     COALESCE(o.notes,'-') AS notes,
       CONCAT('[', 
         IFNULL(
           GROUP_CONCAT(
@@ -54,6 +55,7 @@ module.exports = {
       o.date,
       o.status,
       o.total,
+      o.notes,
       CONCAT('[', 
         IFNULL(
           GROUP_CONCAT(

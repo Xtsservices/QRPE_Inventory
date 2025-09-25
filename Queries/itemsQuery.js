@@ -1,8 +1,8 @@
 module.exports = {
   CREATE_ITEM: `
     INSERT INTO item_master
-    (item_name, type, status_id, units, kg, grams, litres, cost)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    (name, type, cost, status_id, unit)
+    VALUES (?, ?, ?, ?, ?)
   `,
 
   GET_ALL_ITEMS: `

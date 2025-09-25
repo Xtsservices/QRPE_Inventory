@@ -3,7 +3,7 @@ const orderQueries = require("../Queries/orderQuery");
 
 // ----------------- CREATE ORDER -----------------
 exports.createOrder = async (req, res) => {
-  const { vendor_name, date, items, status } = req.body;
+  const { vendor_name, date, items, status, notes } = req.body;
 
   if (!vendor_name || !items || !items.length) {
     return res.status(400).json({
@@ -22,6 +22,7 @@ exports.createOrder = async (req, res) => {
       date || new Date(),
       status || "Pending",
       0,
+      notes || "-",
     ]);
 
     const orderId = orderResult.insertId;
@@ -37,7 +38,7 @@ exports.createOrder = async (req, res) => {
       if (!itemName)
         throw new Error("Item name is required for each order item");
 
-      total += quantity * price;
+      total += price;
 
       await conn.query(orderQueries.insertOrderItem, [
         orderId,
@@ -100,7 +101,7 @@ exports.updateOrder = async (req, res) => {
       if (!itemName)
         throw new Error("Item name is required for each order item");
 
-      total += quantity * price;
+      total += price;
 
       await conn.query(
         "INSERT INTO order_items (order_id, item_name, unit, quantity, price) VALUES (?, ?, ?, ?, ?)",
