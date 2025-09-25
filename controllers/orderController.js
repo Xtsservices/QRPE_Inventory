@@ -118,7 +118,7 @@ exports.updateOrder = async (req, res) => {
       total += lineTotal;
 
       const [updateRes] = await conn.query(
-        "UPDATE order_items SET item_name = ?, unit = ?, quantity = ?, price = ? WHERE order_id = ? AND item_id = ?",
+        "UPDATE order_items SET item_name = ?, unit = ?, quantity = ?, price = ?, status = 'available' WHERE order_id = ? AND item_id = ?",
         [itemName, unit, quantity, price, order_id, itemId]
       );
       if (updateRes.affectedRows === 0) {
