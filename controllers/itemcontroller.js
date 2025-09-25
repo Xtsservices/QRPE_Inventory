@@ -25,6 +25,18 @@ exports.createItem = async (req, res) => {
   }
 
   try {
+
+    const [existing] = await db.execute(
+      "SELECT item_id FROM item_master WHERE name = ?",
+      [name]
+    );
+    if (existing.length > 0) {
+      return res.status(409).json({
+        success: false,
+        error: "Item with this name already exists.",
+      });
+    }
+
     const [result] = await db.execute(
       `INSERT INTO item_master (name, type, cost, status_id, unit)
        VALUES (?, ?, ?, ?, ?)`,
