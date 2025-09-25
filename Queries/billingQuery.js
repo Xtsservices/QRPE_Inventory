@@ -10,7 +10,7 @@ exports.checkVendor = `
 
 // Check item exists
 exports.checkItem = `
-  SELECT cost FROM items WHERE item_id = ?
+  SELECT cost FROM item_master WHERE item_id = ?
 `;
 
 // Insert billing record

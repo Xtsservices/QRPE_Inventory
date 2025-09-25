@@ -134,11 +134,11 @@ exports.updateItem = async (req, res) => {
 
     if (name !== undefined) {
       updateFields.push("name = ?");
-      params.push(name.trim());
+      params.push(name);
     }
     if (type !== undefined) {
-      updateFields.push("type = ?");
-      params.push(type.trim());
+      updateFields.push("`type` = ?");
+      params.push(type);
     }
     if (cost !== undefined) {
       updateFields.push("cost = ?");
@@ -162,7 +162,13 @@ exports.updateItem = async (req, res) => {
       return res.status(404).json({ success: false, error: "Item not found" });
     }
 
-    return res.json({ success: true, message: "Item updated successfully" });
+    const [rows] = await db.query(queries.GET_ITEM_BY_ID, [item_id]);
+    const updated = rows[0];
+
+    return res.json({
+      success: true,
+      data: updated, // ✅ directly return row (already includes type, quantity_with_unit, status etc.)
+    });
   } catch (err) {
     console.error("Error updating item:", err);
     return res.status(500).json({ success: false, error: "Server Error" });

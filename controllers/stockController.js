@@ -4,38 +4,23 @@ const queries = require('../Queries/stockQuery');
 // ----------------- Create Stock -----------------
 exports.createStock = async (req, res) => {
   try {
-    let { item_id, current_stock, unit, min_threshold } = req.body;
+    const { item_id, current_stock, unit, min_threshold } = req.body;
 
-    current_stock = current_stock ? Number(current_stock) : 0;
-    min_threshold = min_threshold ? Number(min_threshold) : 0;
-
-    if (!item_id || !current_stock || !unit) {
-      return res.status(400).json({
-        success: false,
-        error: 'item_id, current_stock, and unit are required.'
-      });
+    if (!item_id || !current_stock || !unit || !min_threshold) {
+      return res.status(400).json({ success: false, error: "All fields are required" });
     }
 
-    // ✅ Get item_name
-    const [[itemRow]] = await db.query(queries.GET_ITEM_NAME, [item_id]);
-    if (!itemRow) {
-      return res.status(400).json({ success: false, error: "Invalid item_id" });
-    }
-
-    // ✅ Insert into stocks
-    const [result] = await db.execute(queries.CREATE_STOCK, [
+    const [result] = await db.query(queries.CREATE_STOCK, [
       item_id,
-      itemRow.item_name,
       current_stock,
       unit,
       min_threshold
     ]);
 
-    res.status(201).json({ success: true, stock_id: result.insertId });
-
+    res.json({ success: true, stock_id: result.insertId });
   } catch (err) {
-    console.error('Error creating stock:', err);
-    res.status(500).json({ success: false, error: err.message });
+    console.error("Error creating stock:", err);
+    res.status(500).json({ success: false, error: "Failed to create stock" });
   }
 };
 

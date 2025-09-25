@@ -1,14 +1,12 @@
 module.exports = {
-  // Insert order
   insertOrder: `
     INSERT INTO orders (vendor_name, date, status, total, notes, is_deleted)
     VALUES (?, ?, ?, ?, ?, 0)
   `,
 
-  // Insert order item
   insertOrderItem: `
-    INSERT INTO order_items (order_id, item_name, unit, quantity, price)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO order_items (order_id, item_name, quantity_unit, price, created_at, updated_at)
+    VALUES (?, ?, ?, ?, NOW(), NOW())
   `,
 
   // Delete items for update
@@ -77,8 +75,9 @@ module.exports = {
     GROUP BY o.order_id
   `,
 
-  // Soft delete
   softDeleteOrder: `
-    UPDATE orders SET is_deleted = 1 WHERE order_id = ?
+    UPDATE orders 
+    SET is_deleted = 1 
+    WHERE order_id = ? AND is_deleted = 0
   `,
 };

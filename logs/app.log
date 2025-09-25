@@ -31,3 +31,16 @@
 [2025-09-19T05:01:36.254Z] INFO: User registered: {"id":"USR011","name":"Test User","role":"Admin","mobileNumber":"8876543210","email":"test1@example.com","status":"Active"}
 [2025-09-19T05:46:32.041Z] INFO: User registered: {"id":"USR012","name":"vamsi","role":"Manager","mobileNumber":"9494564568","email":"vamsi@gmai.com","status":"Active"}
 [2025-09-19T10:06:32.221Z] INFO: User registered: {"id":"USR393278","name":"Pavan","role":"Manager","mobileNumber":"9856123545","email":"pavan@gmail.com","status":"Active"}
+[2025-09-23T08:03:56.227Z] ERROR: Error registering user: lastUser[0].id.replace is not a function
+[2025-09-23T08:04:08.270Z] ERROR: Error registering user: lastUser[0].id.replace is not a function
+[2025-09-23T09:48:13.157Z] ERROR: Error registering user: lastUser[0].id.replace is not a function
+[2025-09-23T09:48:14.073Z] ERROR: Error registering user: lastUser[0].id.replace is not a function
+[2025-09-23T09:48:14.339Z] ERROR: Error registering user: lastUser[0].id.replace is not a function
+[2025-09-23T09:48:17.026Z] ERROR: Error registering user: lastUser[0].id.replace is not a function
+[2025-09-23T09:48:18.246Z] ERROR: Error registering user: lastUser[0].id.replace is not a function
+[2025-09-23T09:48:19.451Z] ERROR: Error registering user: lastUser[0].id.replace is not a function
+[2025-09-24T05:28:35.095Z] ERROR: Error registering user: lastUser[0].id.replace is not a function
+[2025-09-24T13:19:57.878Z] ERROR: Error registering user: lastUser[0].id.replace is not a function
+[2025-09-24T13:20:35.649Z] ERROR: Error registering user: lastUser[0].id.replace is not a function
+[2025-09-25T04:20:59.144Z] ERROR: Error registering user: lastUser[0].id.replace is not a function
+[2025-09-25T04:21:21.636Z] ERROR: Error registering user: lastUser[0].id.replace is not a function
