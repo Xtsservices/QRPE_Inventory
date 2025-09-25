@@ -7,8 +7,8 @@ module.exports = {
 
   // Insert order item
   insertOrderItem: `
-    INSERT INTO order_items (order_id, item_name, unit, quantity, price)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO order_items (order_id, item_id, item_name, unit, quantity, price)
+    VALUES (?, ?, ?, ?, ?, ?)
   `,
 
   // Delete items for update
